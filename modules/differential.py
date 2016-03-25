@@ -44,20 +44,22 @@ class Differential(object):
 
     self.itt = 0
 
+    self.repeats = 10
+
     self.size = size
     self.one = 1.0/size
 
-    self.stp = 1e-3
+    self.stp = 5e-4
     self.spring_stp = 1
-    self.reject_stp = 1e-1
+    self.reject_stp = 0.5
 
     self.nmax = nmax
-    self.max_capacity = 6
+    self.max_capacity = 5
     self.min_capacity = 3
 
-    self.capacity_cool_down = 100
+    self.capacity_cool_down = 50
 
-    self.node_rad = 3*self.one
+    self.node_rad = 5*self.one
     self.disconnect_rad = 2*self.node_rad
     self.inner_influence_rad = 2*self.node_rad
     self.outer_influence_rad = 4*self.node_rad
@@ -67,7 +69,7 @@ class Differential(object):
     self.render.set_line_width(self.one)
 
     self.__init()
-    self.random_init(1000)
+    self.random_init(5000)
 
     self.render.start()
 
@@ -87,7 +89,7 @@ class Differential(object):
 
     num = self.num
 
-    new_xy = darts(n, 0.5, 0.5, 0.1, self.node_rad*1.5)
+    new_xy = darts(n, 0.5, 0.5, 0.4, self.node_rad*1.5)
     new_num = len(new_xy)
     self.xy[num:new_num,:] = new_xy
     self.capacities[num:new_num, 0] = self.max_capacity
@@ -149,7 +151,6 @@ class Differential(object):
         if self.num_edges[c]>=self.max_capacity:
           continue
         if potentials[c] and not self.is_connected(i, c):
-          print('do connect', i, c)
           self.connect(i, c)
 
     # reduced = self.capacities[:num,0] < self.max_capacity
@@ -176,27 +177,36 @@ class Differential(object):
       self.xy[:num,:],
       self.outer_influence_rad
     )
+    potentials = self.num_edges[:num,:] < self.capacities[:num,:]
 
     for i in xrange(self.num):
+      ne = num_edges[i]
+      e = edges[i,:ne]
 
       # connected
-      if num_edges[i]>0:
-        e = edges[i,:num_edges[i]]
+      if ne>0:
         dx = xy[e,:]-xy[i,:]
         dd = norm(dx, axis=1)
         reject = dd<self.node_rad*1.8
+        mid = logical_and(
+          dd>self.node_rad*1.8,
+          dd<self.node_rad*2.2
+        )
         dx /= reshape(dd,(-1,1))
         dx[reject] *= -1
+        dx[mid] = 0
         dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.spring_stp
 
-      # all nearby. TODO: don't do this
-      cands = [c for c in candidate_sets[i] if c != i]
+      out = set([i]+list(e))
+      cands = [c for c in candidate_sets[i] if c not in out]
       if len(cands)>1:
+        inv = 1
+        if potentials[i]:
+          inv = -1
         dx = xy[i,:]-xy[cands,:]
         dd = norm(dx, axis=1)
         force = (self.outer_influence_rad-dd)/self.outer_influence_rad
-        dx /= reshape(dd,(-1,1))
-        dx *= reshape(force,(-1,1))
+        dx *= reshape(inv*force/dd,(-1,1))
         dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.reject_stp
 
     xy[:num,:] += dxy[:num,:]*self.stp
@@ -205,16 +215,18 @@ class Differential(object):
 
     self.itt += 1
     print(self.itt)
-    self.make_tree()
-    self.structure()
-    self.forces()
+
+    for i in xrange(self.repeats):
+      self.make_tree()
+      self.structure()
+      self.forces()
+
     self.show()
     # self.render.write_to_png(self.fn.name())
 
     return True
 
   def show(self):
-
 
     node_rad = self.node_rad
     xy = self.xy
