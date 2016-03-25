@@ -10,8 +10,9 @@ from scipy.spatial import cKDTree as kdt
 from numpy import pi
 from numpy import any
 from numpy import logical_and
-from numpy import array
-from numpy import concatenate
+from numpy import sum
+from numpy import mean
+from numpy.linalg import norm
 from numpy import arange
 from numpy import zeros
 from numpy import ones
@@ -46,9 +47,9 @@ class Differential(object):
     self.size = size
     self.one = 1.0/size
 
-    self.stp = 1e-4
-    self.reject_ratio = 1e-3
-    self.attract_ratio = 1e-3
+    self.stp = 1e-3
+    self.spring_stp = 1
+    self.reject_stp = 1e-1
 
     self.nmax = nmax
     self.max_capacity = 6
@@ -114,6 +115,22 @@ class Differential(object):
     self.num_edges[a] += 1
     self.num_edges[b] += 1
 
+  def disconnect(self, a, b):
+
+    na = self.num_edges[a]
+    nb = self.num_edges[b]
+
+    for i,e in enumerate(self.edges[a,:na]):
+      if e == b:
+       self.edges[a,i] = self.edges[a,na-1]
+
+    for i,e in enumerate(self.edges[b,:nb]):
+      if e == a:
+       self.edges[b,i] = self.edges[b,nb-1]
+
+    self.num_edges[a] -= 1
+    self.num_edges[b] -= 1
+
   def structure(self):
 
     num = self.num
@@ -146,11 +163,43 @@ class Differential(object):
     self.cool_down[potentials_inds[cool],0] = 0
 
 
-  # def forces(self):
+  def forces(self):
 
-    # num = self.num
-    # self.dxy[:num, :]
-    # tree = self.tree
+    num = self.num
+    xy = self.xy
+    edges = self.edges
+    num_edges = self.num_edges
+    dxy = self.dxy
+    dxy[:num,:] = 0
+
+    candidate_sets = self.tree.query_ball_point(
+      self.xy[:num,:],
+      self.outer_influence_rad
+    )
+
+    for i in xrange(self.num):
+
+      # connected
+      if num_edges[i]>0:
+        e = edges[i,:num_edges[i]]
+        dx = xy[e,:]-xy[i,:]
+        dd = norm(dx, axis=1)
+        reject = dd<self.node_rad*1.8
+        dx /= reshape(dd,(-1,1))
+        dx[reject] *= -1
+        dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.spring_stp
+
+      # all nearby. TODO: don't do this
+      cands = [c for c in candidate_sets[i] if c != i]
+      if len(cands)>1:
+        dx = xy[i,:]-xy[cands,:]
+        dd = norm(dx, axis=1)
+        force = (self.outer_influence_rad-dd)/self.outer_influence_rad
+        dx /= reshape(dd,(-1,1))
+        dx *= reshape(force,(-1,1))
+        dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.reject_stp
+
+    xy[:num,:] += dxy[:num,:]*self.stp
 
   def step(self, render):
 
@@ -158,7 +207,7 @@ class Differential(object):
     print(self.itt)
     self.make_tree()
     self.structure()
-    # self.forces()
+    self.forces()
     self.show()
     # self.render.write_to_png(self.fn.name())
 
