@@ -31,7 +31,7 @@ CYAN = [0,1,1,0.5]
 LIGHT = [0,0,0,0.05]
 
 
-class Differential(object):
+class DifferentialLattice(object):
 
   def __init__(
       self,
@@ -69,7 +69,7 @@ class Differential(object):
     self.render.set_line_width(self.one)
 
     self.__init()
-    self.random_init(5000)
+    self.spawn(5000)
 
     self.render.start()
 
@@ -82,19 +82,17 @@ class Differential(object):
     self.dxy = zeros((nmax, 2), 'float')
     self.cool_down = zeros((nmax, 1), 'int')
     self.edges = zeros((nmax, self.max_capacity), 'int')
-    self.capacities = zeros((nmax, 1), 'int')
+    self.capacities = zeros((nmax, 1), 'int') + self.max_capacity
     self.num_edges = zeros((nmax, 1), 'int')
 
-  def random_init(self, n):
+  def spawn(self, n):
 
     num = self.num
 
     new_xy = darts(n, 0.5, 0.5, 0.4, self.node_rad*1.5)
     new_num = len(new_xy)
-    self.xy[num:new_num,:] = new_xy
-    self.capacities[num:new_num, 0] = self.max_capacity
-    # self.cool_down[num:new_num] = 0
-    # self.num_edges[num:new_num] = 0
+    if new_num>0:
+      self.xy[num:num+new_num,:] = new_xy
 
     self.num += new_num
     return new_num
@@ -219,6 +217,7 @@ class Differential(object):
     for i in xrange(self.repeats):
       self.make_tree()
       self.structure()
+      self.spawn(5)
       self.forces()
 
     self.show()

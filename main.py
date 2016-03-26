@@ -8,10 +8,10 @@ from __future__ import print_function
 
 def main():
 
-  from modules.differential import Differential
+  from modules.differentialLattice import DifferentialLattice
 
   size = 1000
-  Differential(size)
+  DifferentialLattice(size)
 
 
 if __name__ == '__main__':
