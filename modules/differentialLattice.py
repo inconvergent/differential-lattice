@@ -5,16 +5,14 @@ from __future__ import print_function
 from render.render import Animate
 from fn import Fn
 
-from scipy.spatial import cKDTree as kdt
-
 from numpy import pi
 from numpy import any
-from numpy import sum
+from numpy import array
 from numpy import logical_and
 from numpy import logical_or
+from numpy import logical_not
 from numpy import max
 from numpy import mean
-from numpy.linalg import norm
 from numpy import arange
 from numpy import zeros
 from numpy import column_stack
@@ -22,9 +20,11 @@ from numpy import sin
 from numpy import cos
 from numpy import ones
 from numpy import reshape
-from numpy.random import random
 
+from numpy.random import random
+from numpy.linalg import norm
 from scipy.spatial.distance import cdist
+from scipy.spatial import cKDTree as kdt
 
 
 
@@ -33,8 +33,8 @@ PI = pi
 HPI = pi*0.5
 
 BACK = [1,1,1,1]
-FRONT = [0,0,0,0.7]
-CYAN = [0,0.6,0.6,0.7]
+FRONT = [0,0,0,0.5]
+CYAN = [0,0.6,0.6,0.5]
 LIGHT = [0,0,0,0.05]
 
 
@@ -58,15 +58,15 @@ class DifferentialLattice(object):
 
     self.stp = 4e-4
     self.spring_stp = 1
-    self.reject_stp = 0.5
+    self.reject_stp = 1
 
     self.nmax = nmax
     self.max_capacity = 5
     self.min_capacity = 3
 
-    self.capacity_cool_down = 5
+    self.capacity_cool_down = 15
 
-    self.node_rad = 5*self.one
+    self.node_rad = 7*self.one
     self.disconnect_rad = 2*self.node_rad
     self.inner_influence_rad = 2*self.node_rad
     self.outer_influence_rad = 20*self.node_rad
@@ -183,7 +183,11 @@ class DifferentialLattice(object):
     num = self.num
     potentials = self.num_edges[:num,0] < self.capacities[:num,0]
     potentials_inds = arange(num)[potentials]
-    candidate_sets = self.tree.query_ball_point(self.xy[potentials_inds,:], self.disconnect_rad)
+    not_potentials_inds = arange(num)[logical_not(potentials)]
+    candidate_sets = self.tree.query_ball_point(
+      self.xy[potentials_inds,:],
+      self.disconnect_rad
+    )
 
     for i, cands in zip(potentials_inds, candidate_sets):
 
@@ -211,6 +215,7 @@ class DifferentialLattice(object):
 
     self.capacities[potentials_inds[cool]] -= 1
     self.cool_down[potentials_inds[cool],0] = 0
+    self.cool_down[not_potentials_inds,0] = 0
 
 
   def forces(self):
@@ -250,17 +255,15 @@ class DifferentialLattice(object):
       out = set([i]+list(e))
       cands = [c for c in candidate_sets[i] if c not in out]
       if len(cands)>1:
-        inv = ones(len(cands), 'float')
 
         if potentials[i]:
-          p = potentials[cands,0]
-          inv[p] *= -1
-
-        dx = xy[i,:]-xy[cands,:]
-        dd = norm(dx, axis=1)
-        force = (self.outer_influence_rad-dd)/self.outer_influence_rad
-        dx *= reshape(inv*force/dd,(-1,1))
-        dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.reject_stp
+          mask = potentials[cands,0]
+          active_cands = array(cands)[mask]
+          dx = xy[i,:]-xy[active_cands,:]
+          dd = norm(dx, axis=1)
+          force = (self.outer_influence_rad-dd)/self.outer_influence_rad
+          dx *= reshape(-force/dd,(-1,1))
+          dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.reject_stp
 
     xy[:num,:] += dxy[:num,:]*self.stp
 
@@ -270,7 +273,7 @@ class DifferentialLattice(object):
     print('itt', self.itt, 'num', self.num)
 
     self.reset_structure()
-    self.potential_spawn(ratio=0.01)
+    self.potential_spawn(ratio=0.005)
     self.make_tree()
     self.structure()
     self.show()
@@ -278,10 +281,13 @@ class DifferentialLattice(object):
     for i in xrange(self.repeats):
       self.forces()
 
-
     return True
 
   def show(self):
+
+    from numpy import row_stack
+    from numpy import tile
+    from numpy import concatenate
 
     node_rad = self.node_rad
     xy = self.xy
@@ -290,29 +296,35 @@ class DifferentialLattice(object):
     fill = self.render.ctx.fill
     move_to = self.render.ctx.move_to
     line_to = self.render.ctx.line_to
+
     self.render.clear_canvas()
 
     # cap_flag = self.capacities[:self.num,0] < self.max_capacity
-    potentials_flag = self.num_edges[:self.num,0] < self.capacities[:self.num,0]
+    potentials = self.num_edges[:self.num,0] < self.capacities[:self.num,0]
 
     self.render.ctx.set_source_rgba(*FRONT)
     for i in xrange(self.num):
 
-      nc = self.num_edges[i]
-      for j in xrange(nc):
-        c = self.edges[i,j]
-        move_to(xy[i,0], xy[i,1])
-        line_to(xy[c,0], xy[c,1])
+      # nc = self.num_edges[i]
+      # if nc>0:
+        # t = tile(i, nc)
+        # origin = xy[t,:]
+        # stop = xy[self.edges[i,:nc],:]
+        # self.render.sandstroke(column_stack([origin, stop]), grains=5)
 
-      stroke()
-
-    for i in xrange(self.num):
-
-      if potentials_flag[i]:
+      if potentials[i]:
         self.render.ctx.set_source_rgba(*CYAN)
       else:
         self.render.ctx.set_source_rgba(*FRONT)
-
       arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
       fill()
+
+      self.render.ctx.set_source_rgba(*FRONT)
+      nc = self.num_edges[i]
+      for j in xrange(nc):
+        c = self.edges[i,j]
+
+        move_to(xy[i,0], xy[i,1])
+        line_to(xy[c,0], xy[c,1])
+        stroke()
 
