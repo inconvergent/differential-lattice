@@ -9,6 +9,7 @@ from scipy.spatial import cKDTree as kdt
 
 from numpy import pi
 from numpy import any
+from numpy import sum
 from numpy import logical_and
 from numpy import logical_or
 from numpy import max
@@ -63,19 +64,19 @@ class DifferentialLattice(object):
     self.max_capacity = 5
     self.min_capacity = 3
 
-    self.capacity_cool_down = 40
+    self.capacity_cool_down = 5
 
-    self.node_rad = 3*self.one
+    self.node_rad = 5*self.one
     self.disconnect_rad = 2*self.node_rad
     self.inner_influence_rad = 2*self.node_rad
-    self.outer_influence_rad = 10*self.node_rad
+    self.outer_influence_rad = 20*self.node_rad
 
     self.fn = Fn(prefix=prefix, postfix='.png')
     self.render = Animate(size, back, front, self.step)
     self.render.set_line_width(self.one)
 
     self.__init()
-    self.spawn(8000, dst=self.node_rad*0.8, rad=0.25)
+    self.spawn(200, dst=self.node_rad*0.8, rad=0.2)
 
     self.render.start()
 
@@ -104,6 +105,24 @@ class DifferentialLattice(object):
 
     self.num += new_num
     return new_num
+
+  def potential_spawn(self, ratio):
+
+    num = self.num
+    potentials = self.num_edges[:num,0] < self.capacities[:num,0]
+    inds = arange(num)[potentials]
+    selected = inds[random(len(inds))<ratio]
+
+    new_num = len(selected)
+    if new_num>0:
+      new_xy = self.xy[selected,:]
+      theta = random(new_num)*TWOPI
+      offset = column_stack([cos(theta), sin(theta)])*self.node_rad*0.05
+      self.xy[num:num+new_num,:] = new_xy+offset
+      self.num += new_num
+      return new_num
+
+    return 0
 
   def make_tree(self):
 
@@ -251,13 +270,14 @@ class DifferentialLattice(object):
     print('itt', self.itt, 'num', self.num)
 
     self.reset_structure()
+    self.potential_spawn(ratio=0.01)
     self.make_tree()
     self.structure()
+    self.show()
+    self.render.write_to_png(self.fn.name())
     for i in xrange(self.repeats):
       self.forces()
 
-    self.show()
-    self.render.write_to_png(self.fn.name())
 
     return True
 
@@ -275,19 +295,6 @@ class DifferentialLattice(object):
     # cap_flag = self.capacities[:self.num,0] < self.max_capacity
     potentials_flag = self.num_edges[:self.num,0] < self.capacities[:self.num,0]
 
-    for i in xrange(self.num):
-
-      if potentials_flag[i]:
-        self.render.ctx.set_source_rgba(*CYAN)
-      else:
-        self.render.ctx.set_source_rgba(*FRONT)
-
-      arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
-      fill()
-
-      # arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
-      # stroke()
-
     self.render.ctx.set_source_rgba(*FRONT)
     for i in xrange(self.num):
 
@@ -298,4 +305,14 @@ class DifferentialLattice(object):
         line_to(xy[c,0], xy[c,1])
 
       stroke()
+
+    for i in xrange(self.num):
+
+      if potentials_flag[i]:
+        self.render.ctx.set_source_rgba(*CYAN)
+      else:
+        self.render.ctx.set_source_rgba(*FRONT)
+
+      arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
+      fill()
 

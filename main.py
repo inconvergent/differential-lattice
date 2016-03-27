@@ -10,7 +10,7 @@ def main():
 
   from modules.differentialLattice import DifferentialLattice
 
-  size = 1000
+  size = 500
   DifferentialLattice(size)
 
 
