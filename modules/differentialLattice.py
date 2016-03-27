@@ -28,11 +28,12 @@ from scipy.spatial.distance import cdist
 
 
 TWOPI = pi*2
+PI = pi
 HPI = pi*0.5
 
 BACK = [1,1,1,1]
-FRONT = [0,0,0,0.5]
-CYAN = [0,1,1,0.5]
+FRONT = [0,0,0,0.7]
+CYAN = [0,0.6,0.6,0.7]
 LIGHT = [0,0,0,0.05]
 
 
@@ -60,11 +61,11 @@ class DifferentialLattice(object):
 
     self.nmax = nmax
     self.max_capacity = 5
-    self.min_capacity = 2
+    self.min_capacity = 3
 
-    self.capacity_cool_down = 20
+    self.capacity_cool_down = 40
 
-    self.node_rad = 5*self.one
+    self.node_rad = 3*self.one
     self.disconnect_rad = 2*self.node_rad
     self.inner_influence_rad = 2*self.node_rad
     self.outer_influence_rad = 10*self.node_rad
@@ -74,7 +75,7 @@ class DifferentialLattice(object):
     self.render.set_line_width(self.one)
 
     self.__init()
-    self.spawn(2000, dst=self.node_rad*0.5)
+    self.spawn(8000, dst=self.node_rad*0.8, rad=0.25)
 
     self.render.start()
 
@@ -90,14 +91,13 @@ class DifferentialLattice(object):
     self.capacities = zeros((nmax, 1), 'int') + self.max_capacity
     self.num_edges = zeros((nmax, 1), 'int')
 
-  def spawn(self, n, dst):
+  def spawn(self, n, dst, rad=0.4):
 
     # from dddUtils.random import darts
-
     num = self.num
-    # new_xy = darts(n, 0.5, 0.5, 0.4, dst)
+    # new_xy = darts(n, 0.5, 0.5, rad, dst)
     theta = random(n)*TWOPI
-    new_xy = 0.5 + column_stack([cos(theta), sin(theta)])*0.4
+    new_xy = 0.5 + column_stack([cos(theta), sin(theta)])*rad
     new_num = len(new_xy)
     if new_num>0:
       self.xy[num:num+new_num,:] = new_xy
@@ -248,7 +248,7 @@ class DifferentialLattice(object):
   def step(self, render):
 
     self.itt += 1
-    print(self.itt)
+    print('itt', self.itt, 'num', self.num)
 
     self.reset_structure()
     self.make_tree()
@@ -276,14 +276,17 @@ class DifferentialLattice(object):
     potentials_flag = self.num_edges[:self.num,0] < self.capacities[:self.num,0]
 
     for i in xrange(self.num):
+
       if potentials_flag[i]:
         self.render.ctx.set_source_rgba(*CYAN)
-        arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
-        fill()
+      else:
         self.render.ctx.set_source_rgba(*FRONT)
 
       arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
-      stroke()
+      fill()
+
+      # arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
+      # stroke()
 
     self.render.ctx.set_source_rgba(*FRONT)
     for i in xrange(self.num):
