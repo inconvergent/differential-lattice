@@ -92,6 +92,8 @@ class DifferentialLattice(object):
     self.capacities = zeros((nmax, 1), 'int') + self.max_capacity
     self.num_edges = zeros((nmax, 1), 'int')
 
+    self.potential = zeros((nmax, 1), 'bool')
+
   def spawn(self, n, dst, rad=0.4):
 
     # from dddUtils.random import darts
@@ -109,8 +111,9 @@ class DifferentialLattice(object):
   def potential_spawn(self, ratio):
 
     num = self.num
-    potentials = self.num_edges[:num,0] < self.capacities[:num,0]
-    inds = arange(num)[potentials]
+    potential = self.potential[:num,0]
+
+    inds = arange(num)[potential]
     selected = inds[random(len(inds))<ratio]
 
     new_num = len(selected)
@@ -123,10 +126,6 @@ class DifferentialLattice(object):
       return new_num
 
     return 0
-
-  def make_tree(self):
-
-    self.tree = kdt(self.xy[:self.num,:])
 
   def is_connected(self, a, b):
 
@@ -173,23 +172,19 @@ class DifferentialLattice(object):
     mas = max(uv, axis=0)
     return us<mas
 
-  def reset_structure(self):
-
-    num = self.num
-    self.num_edges[:num,0] = 0
-
   def structure(self):
 
     num = self.num
-    potentials = self.num_edges[:num,0] < self.capacities[:num,0]
-    potentials_inds = arange(num)[potentials]
-    not_potentials_inds = arange(num)[logical_not(potentials)]
+
+    self.tree = kdt(self.xy[:self.num,:])
+    self.num_edges[:num,0] = 0
+
     candidate_sets = self.tree.query_ball_point(
-      self.xy[potentials_inds,:],
+      self.xy[:num,:],
       self.disconnect_rad
     )
 
-    for i, cands in zip(potentials_inds, candidate_sets):
+    for i, cands in enumerate(candidate_sets):
 
       cands = [c for c in cands if c != i]
       rel = self.__is_relative_neighbor(i, cands)
@@ -199,14 +194,16 @@ class DifferentialLattice(object):
           break
         if self.num_edges[c]>=self.max_capacity:
           continue
-        if not potentials[c]:
-          continue
         if self.is_connected(i, c):
           continue
         if rel[j]:
           self.connect(i, c)
 
     # reduced = self.capacities[:num,0] < self.max_capacity
+
+    self.potential[:num,0] = self.num_edges[:num,0] < self.capacities[:num,0]
+
+    potentials_inds = self.potential[:num,0].nonzero()[0]
     self.cool_down[potentials_inds,0] += 1
     cool = logical_and(
       self.cool_down[potentials_inds,0] > self.capacity_cool_down,
@@ -215,8 +212,9 @@ class DifferentialLattice(object):
 
     self.capacities[potentials_inds[cool]] -= 1
     self.cool_down[potentials_inds[cool],0] = 0
-    self.cool_down[not_potentials_inds,0] = 0
 
+    not_potentials_inds = logical_not(self.potential[:num,0]).nonzero()[0]
+    self.cool_down[not_potentials_inds,0] = 0
 
   def forces(self):
 
@@ -224,14 +222,15 @@ class DifferentialLattice(object):
     xy = self.xy
     edges = self.edges
     num_edges = self.num_edges
+    potential = self.potential[:num,:]
     dxy = self.dxy
+
     dxy[:num,:] = 0
 
     candidate_sets = self.tree.query_ball_point(
       self.xy[:num,:],
       self.outer_influence_rad
     )
-    potentials = self.num_edges[:num,:] < self.capacities[:num,:]
 
     for i in xrange(self.num):
       ne = num_edges[i]
@@ -256,8 +255,8 @@ class DifferentialLattice(object):
       cands = [c for c in candidate_sets[i] if c not in out]
       if len(cands)>1:
 
-        if potentials[i]:
-          mask = potentials[cands,0]
+        if potential[i]:
+          mask = potential[cands,0]
           active_cands = array(cands)[mask]
           dx = xy[i,:]-xy[active_cands,:]
           dd = norm(dx, axis=1)
@@ -272,12 +271,13 @@ class DifferentialLattice(object):
     self.itt += 1
     print('itt', self.itt, 'num', self.num)
 
-    self.reset_structure()
-    self.potential_spawn(ratio=0.005)
-    self.make_tree()
     self.structure()
+
     self.show()
     self.render.write_to_png(self.fn.name())
+
+    self.potential_spawn(ratio=0.005)
+
     for i in xrange(self.repeats):
       self.forces()
 
@@ -285,12 +285,10 @@ class DifferentialLattice(object):
 
   def show(self):
 
-    from numpy import row_stack
-    from numpy import tile
-    from numpy import concatenate
-
     node_rad = self.node_rad
     xy = self.xy
+    num = self.num
+    potential = self.potential[:num,0]
     arc = self.render.ctx.arc
     stroke = self.render.ctx.stroke
     fill = self.render.ctx.fill
@@ -299,11 +297,10 @@ class DifferentialLattice(object):
 
     self.render.clear_canvas()
 
-    # cap_flag = self.capacities[:self.num,0] < self.max_capacity
-    potentials = self.num_edges[:self.num,0] < self.capacities[:self.num,0]
+    # cap_flag = self.capacities[:num,0] < self.max_capacity
 
     self.render.ctx.set_source_rgba(*FRONT)
-    for i in xrange(self.num):
+    for i in xrange(num):
 
       # nc = self.num_edges[i]
       # if nc>0:
@@ -312,7 +309,7 @@ class DifferentialLattice(object):
         # stop = xy[self.edges[i,:nc],:]
         # self.render.sandstroke(column_stack([origin, stop]), grains=5)
 
-      if potentials[i]:
+      if potential[i]:
         self.render.ctx.set_source_rgba(*CYAN)
       else:
         self.render.ctx.set_source_rgba(*FRONT)
