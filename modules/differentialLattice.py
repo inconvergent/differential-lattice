@@ -76,7 +76,8 @@ class DifferentialLattice(object):
     self.render.set_line_width(self.one)
 
     self.__init()
-    self.spawn(200, dst=self.node_rad*0.8, rad=0.2)
+    self.spawn(100, xy=array([[0.4,0.4]]),dst=self.node_rad*0.8, rad=0.1)
+    self.spawn(100, xy=array([[0.6,0.6]]),dst=self.node_rad*0.8, rad=0.1)
 
     self.render.start()
 
@@ -93,14 +94,15 @@ class DifferentialLattice(object):
     self.num_edges = zeros((nmax, 1), 'int')
 
     self.potential = zeros((nmax, 1), 'bool')
+    self.cand_count = zeros((nmax, 1), 'int')
 
-  def spawn(self, n, dst, rad=0.4):
+  def spawn(self, n, xy, dst, rad=0.4):
 
     # from dddUtils.random import darts
     num = self.num
     # new_xy = darts(n, 0.5, 0.5, rad, dst)
     theta = random(n)*TWOPI
-    new_xy = 0.5 + column_stack([cos(theta), sin(theta)])*rad
+    new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
     new_num = len(new_xy)
     if new_num>0:
       self.xy[num:num+new_num,:] = new_xy
@@ -111,7 +113,8 @@ class DifferentialLattice(object):
   def potential_spawn(self, ratio):
 
     num = self.num
-    potential = self.potential[:num,0]
+    # potential = self.potential[:num,0]
+    potential = self.cand_count[:num,0] < 5
 
     inds = arange(num)[potential]
     selected = inds[random(len(inds))<ratio]
@@ -184,6 +187,8 @@ class DifferentialLattice(object):
       self.disconnect_rad
     )
 
+    self.cand_count[:num,0] = [len(c) for c in candidate_sets]
+
     for i, cands in enumerate(candidate_sets):
 
       cands = [c for c in cands if c != i]
@@ -203,18 +208,18 @@ class DifferentialLattice(object):
 
     self.potential[:num,0] = self.num_edges[:num,0] < self.capacities[:num,0]
 
-    potentials_inds = self.potential[:num,0].nonzero()[0]
-    self.cool_down[potentials_inds,0] += 1
-    cool = logical_and(
-      self.cool_down[potentials_inds,0] > self.capacity_cool_down,
-      self.capacities[potentials_inds,0] > self.min_capacity
-    )
+    # potentials_inds = self.potential[:num,0].nonzero()[0]
+    # self.cool_down[potentials_inds,0] += 1
+    # cool = logical_and(
+      # self.cool_down[potentials_inds,0] > self.capacity_cool_down,
+      # self.capacities[potentials_inds,0] > self.min_capacity
+    # )
 
-    self.capacities[potentials_inds[cool]] -= 1
-    self.cool_down[potentials_inds[cool],0] = 0
+    # self.capacities[potentials_inds[cool]] -= 1
+    # self.cool_down[potentials_inds[cool],0] = 0
 
-    not_potentials_inds = logical_not(self.potential[:num,0]).nonzero()[0]
-    self.cool_down[not_potentials_inds,0] = 0
+    # not_potentials_inds = logical_not(self.potential[:num,0]).nonzero()[0]
+    # self.cool_down[not_potentials_inds,0] = 0
 
   def forces(self):
 
@@ -276,7 +281,7 @@ class DifferentialLattice(object):
     self.show()
     self.render.write_to_png(self.fn.name())
 
-    self.potential_spawn(ratio=0.005)
+    self.potential_spawn(ratio=0.01)
 
     for i in xrange(self.repeats):
       self.forces()
@@ -297,7 +302,8 @@ class DifferentialLattice(object):
 
     self.render.clear_canvas()
 
-    # cap_flag = self.capacities[:num,0] < self.max_capacity
+    # cap = self.capacities[:num,0] < self.max_capacity
+    cand_flag = self.cand_count[:num,0] < 5
 
     self.render.ctx.set_source_rgba(*FRONT)
     for i in xrange(num):
@@ -309,7 +315,7 @@ class DifferentialLattice(object):
         # stop = xy[self.edges[i,:nc],:]
         # self.render.sandstroke(column_stack([origin, stop]), grains=5)
 
-      if potential[i]:
+      if cand_flag[i]:
         self.render.ctx.set_source_rgba(*CYAN)
       else:
         self.render.ctx.set_source_rgba(*FRONT)
