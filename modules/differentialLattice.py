@@ -64,7 +64,7 @@ class DifferentialLattice(object):
     self.max_capacity = 5
     self.min_capacity = 3
 
-    self.capacity_cool_down = 15
+    self.alive_age = 15
 
     self.node_rad = 7*self.one
     self.disconnect_rad = 2*self.node_rad
@@ -88,9 +88,11 @@ class DifferentialLattice(object):
 
     self.xy = zeros((nmax, 2), 'float')
     self.dxy = zeros((nmax, 2), 'float')
-    self.cool_down = zeros((nmax, 1), 'int')
-    self.edges = zeros((nmax, self.max_capacity), 'int')
+    self.age = zeros((nmax, 1), 'int')
+    self.active = ones((nmax, 1), 'bool')
     self.capacities = zeros((nmax, 1), 'int') + self.max_capacity
+
+    self.edges = {}
     self.num_edges = zeros((nmax, 1), 'int')
 
     self.potential = zeros((nmax, 1), 'bool')
@@ -98,8 +100,8 @@ class DifferentialLattice(object):
 
   def spawn(self, n, xy, dst, rad=0.4):
 
-    # from dddUtils.random import darts
     num = self.num
+    # from dddUtils.random import darts
     # new_xy = darts(n, 0.5, 0.5, rad, dst)
     theta = random(n)*TWOPI
     new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
@@ -132,31 +134,36 @@ class DifferentialLattice(object):
 
   def is_connected(self, a, b):
 
-    if self.num_edges[a] < 1 or self.num_edges[b] < 1:
+    edges = self.edges
+
+    if a not in edges:
+      return False
+    if b not in edges:
       return False
 
-    return any(self.edges[a,:self.num_edges[a]] == b)
+    return b in edges[a]
 
   def connect(self, a, b):
 
-    self.edges[a,self.num_edges[a]] = b
-    self.edges[b,self.num_edges[b]] = a
+    edges = self.edges
+
+    if a in edges:
+      edges[a].add(b)
+    else:
+      edges[a] = set([b])
+
+    if b in edges:
+      edges[b].add(a)
+    else:
+      edges[b] = set([a])
+
     self.num_edges[a] += 1
     self.num_edges[b] += 1
 
   def disconnect(self, a, b):
 
-    na = self.num_edges[a]
-    nb = self.num_edges[b]
-
-    for i,e in enumerate(self.edges[a,:na]):
-      if e == b:
-       self.edges[a,i] = self.edges[a,na-1]
-
-    for i,e in enumerate(self.edges[b,:nb]):
-      if e == a:
-       self.edges[b,i] = self.edges[b,nb-1]
-
+    self.edges[a].remove(b)
+    self.edges[b].remove(a)
     self.num_edges[a] -= 1
     self.num_edges[b] -= 1
 
@@ -175,12 +182,20 @@ class DifferentialLattice(object):
     mas = max(uv, axis=0)
     return us<mas
 
+  def __reset_edges(self):
+
+    self.edges = {}
+    self.num_edges[:self.num,0] = 0
+
+    # for v1, ee in self.edges.iteritems():
+      # self.num_edges[v1,0] = len(ee)
+
   def structure(self):
 
     num = self.num
 
     self.tree = kdt(self.xy[:self.num,:])
-    self.num_edges[:num,0] = 0
+    self.__reset_edges()
 
     candidate_sets = self.tree.query_ball_point(
       self.xy[:num,:],
@@ -204,22 +219,9 @@ class DifferentialLattice(object):
         if rel[j]:
           self.connect(i, c)
 
-    # reduced = self.capacities[:num,0] < self.max_capacity
-
     self.potential[:num,0] = self.num_edges[:num,0] < self.capacities[:num,0]
-
-    # potentials_inds = self.potential[:num,0].nonzero()[0]
-    # self.cool_down[potentials_inds,0] += 1
-    # cool = logical_and(
-      # self.cool_down[potentials_inds,0] > self.capacity_cool_down,
-      # self.capacities[potentials_inds,0] > self.min_capacity
-    # )
-
-    # self.capacities[potentials_inds[cool]] -= 1
-    # self.cool_down[potentials_inds[cool],0] = 0
-
-    # not_potentials_inds = logical_not(self.potential[:num,0]).nonzero()[0]
-    # self.cool_down[not_potentials_inds,0] = 0
+    self.age[:num,0] += 1
+    self.active[:num,0] = self.age[:num,0] < self.alive_age
 
   def forces(self):
 
@@ -238,12 +240,14 @@ class DifferentialLattice(object):
     )
 
     for i in xrange(self.num):
-      ne = num_edges[i]
-      e = edges[i,:ne]
 
       # connected
-      if ne>0:
-        dx = xy[e,:]-xy[i,:]
+
+      e = set([])
+
+      if i in edges:
+        e = edges[i]
+        dx = xy[list(e),:]-xy[i,:]
         dd = norm(dx, axis=1)
         reject = dd<self.node_rad*1.8
         mid = logical_or(
@@ -256,7 +260,7 @@ class DifferentialLattice(object):
           dxy[i,:] += reshape(mean(dx[mid,:], axis=0), 2)*self.spring_stp
 
       # unconnected
-      out = set([i]+list(e))
+      out = e.union([i])
       cands = [c for c in candidate_sets[i] if c not in out]
       if len(cands)>1:
 
@@ -306,7 +310,7 @@ class DifferentialLattice(object):
     cand_flag = self.cand_count[:num,0] < 5
 
     self.render.ctx.set_source_rgba(*FRONT)
-    for i in xrange(num):
+    for v1,ee in self.edges.iteritems():
 
       # nc = self.num_edges[i]
       # if nc>0:
@@ -315,19 +319,16 @@ class DifferentialLattice(object):
         # stop = xy[self.edges[i,:nc],:]
         # self.render.sandstroke(column_stack([origin, stop]), grains=5)
 
-      if cand_flag[i]:
+      if cand_flag[v1]:
         self.render.ctx.set_source_rgba(*CYAN)
       else:
         self.render.ctx.set_source_rgba(*FRONT)
-      arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
+      arc(xy[v1,0], xy[v1,1], 0.5*node_rad, 0, TWOPI)
       fill()
 
       self.render.ctx.set_source_rgba(*FRONT)
-      nc = self.num_edges[i]
-      for j in xrange(nc):
-        c = self.edges[i,j]
-
-        move_to(xy[i,0], xy[i,1])
-        line_to(xy[c,0], xy[c,1])
+      for v2 in ee:
+        move_to(xy[v1,0], xy[v1,1])
+        line_to(xy[v2,0], xy[v2,1])
         stroke()
 
