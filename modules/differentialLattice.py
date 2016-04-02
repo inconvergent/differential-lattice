@@ -2,15 +2,12 @@
 
 from __future__ import print_function
 
-from render.render import Animate
-from fn import Fn
-
 from numpy import pi
 from numpy import any
 from numpy import array
 from numpy import logical_and
 from numpy import logical_or
-from numpy import logical_not
+from numpy import tile
 from numpy import max
 from numpy import mean
 from numpy import arange
@@ -32,54 +29,49 @@ TWOPI = pi*2
 PI = pi
 HPI = pi*0.5
 
-BACK = [1,1,1,1]
-FRONT = [0,0,0,0.5]
-CYAN = [0,0.6,0.6,0.5]
-LIGHT = [0,0,0,0.05]
-
 
 class DifferentialLattice(object):
 
   def __init__(
       self,
       size,
-      prefix = './res/',
-      nmax = 1000000,
-      back = BACK,
-      front = FRONT
+      stp,
+      spring_stp,
+      reject_stp,
+      max_capacity,
+      min_capacity,
+      cand_count_limit,
+      capacity_cool_down,
+      node_rad,
+      disconnect_rad,
+      inner_influence_rad,
+      outer_influence_rad,
+      repeats = 10,
+      nmax = 1000000
     ):
 
     self.itt = 0
 
-    self.repeats = 10
 
+    self.nmax = nmax
     self.size = size
     self.one = 1.0/size
 
-    self.stp = 4e-4
-    self.spring_stp = 1
-    self.reject_stp = 1
+    self.repeats = repeats
 
-    self.nmax = nmax
-    self.max_capacity = 5
-    self.min_capacity = 3
-
-    self.capacity_cool_down = 15
-
-    self.node_rad = 7*self.one
-    self.disconnect_rad = 2*self.node_rad
-    self.inner_influence_rad = 2*self.node_rad
-    self.outer_influence_rad = 20*self.node_rad
-
-    self.fn = Fn(prefix=prefix, postfix='.png')
-    self.render = Animate(size, back, front, self.step)
-    self.render.set_line_width(self.one)
+    self.stp = stp
+    self.spring_stp = spring_stp
+    self.reject_stp = reject_stp
+    self.max_capacity = max_capacity
+    self.min_capacity = min_capacity
+    self.cand_count_limit = cand_count_limit
+    self.capacity_cool_down = capacity_cool_down
+    self.node_rad = node_rad
+    self.disconnect_rad = disconnect_rad
+    self.inner_influence_rad = inner_influence_rad
+    self.outer_influence_rad = outer_influence_rad
 
     self.__init()
-    self.spawn(100, xy=array([[0.4,0.4]]),dst=self.node_rad*0.8, rad=0.1)
-    self.spawn(100, xy=array([[0.6,0.6]]),dst=self.node_rad*0.8, rad=0.1)
-
-    self.render.start()
 
   def __init(self):
 
@@ -110,13 +102,12 @@ class DifferentialLattice(object):
     self.num += new_num
     return new_num
 
-  def potential_spawn(self, ratio):
+  def cand_spawn(self, ratio):
 
     num = self.num
-    # potential = self.potential[:num,0]
-    potential = self.cand_count[:num,0] < 5
+    mask = self.cand_count[:num,0] < self.cand_count_limit
 
-    inds = arange(num)[potential]
+    inds = arange(num)[mask]
     selected = inds[random(len(inds))<ratio]
 
     new_num = len(selected)
@@ -204,22 +195,7 @@ class DifferentialLattice(object):
         if rel[j]:
           self.connect(i, c)
 
-    # reduced = self.capacities[:num,0] < self.max_capacity
-
     self.potential[:num,0] = self.num_edges[:num,0] < self.capacities[:num,0]
-
-    # potentials_inds = self.potential[:num,0].nonzero()[0]
-    # self.cool_down[potentials_inds,0] += 1
-    # cool = logical_and(
-      # self.cool_down[potentials_inds,0] > self.capacity_cool_down,
-      # self.capacities[potentials_inds,0] > self.min_capacity
-    # )
-
-    # self.capacities[potentials_inds[cool]] -= 1
-    # self.cool_down[potentials_inds[cool],0] = 0
-
-    # not_potentials_inds = logical_not(self.potential[:num,0]).nonzero()[0]
-    # self.cool_down[not_potentials_inds,0] = 0
 
   def forces(self):
 
@@ -258,76 +234,19 @@ class DifferentialLattice(object):
       # unconnected
       out = set([i]+list(e))
       cands = [c for c in candidate_sets[i] if c not in out]
-      if len(cands)>1:
+      nc = len(cands)
+      if nc>1:
 
+        inv = ones(nc, 'float')
         if potential[i]:
-          mask = potential[cands,0]
-          active_cands = array(cands)[mask]
-          dx = xy[i,:]-xy[active_cands,:]
-          dd = norm(dx, axis=1)
-          force = (self.outer_influence_rad-dd)/self.outer_influence_rad
-          dx *= reshape(-force/dd,(-1,1))
-          dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.reject_stp
+          inv[potential[cands,0]] = -1
+
+        dx = xy[i,:]-xy[cands,:]
+        dd = norm(dx, axis=1)
+        force = (self.outer_influence_rad-dd)/self.outer_influence_rad
+        dx *= reshape(inv*force/dd,(-1,1))
+        dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.reject_stp
 
     xy[:num,:] += dxy[:num,:]*self.stp
 
-  def step(self, render):
-
-    self.itt += 1
-    print('itt', self.itt, 'num', self.num)
-
-    self.structure()
-
-    self.show()
-    self.render.write_to_png(self.fn.name())
-
-    self.potential_spawn(ratio=0.01)
-
-    for i in xrange(self.repeats):
-      self.forces()
-
-    return True
-
-  def show(self):
-
-    node_rad = self.node_rad
-    xy = self.xy
-    num = self.num
-    potential = self.potential[:num,0]
-    arc = self.render.ctx.arc
-    stroke = self.render.ctx.stroke
-    fill = self.render.ctx.fill
-    move_to = self.render.ctx.move_to
-    line_to = self.render.ctx.line_to
-
-    self.render.clear_canvas()
-
-    # cap = self.capacities[:num,0] < self.max_capacity
-    cand_flag = self.cand_count[:num,0] < 5
-
-    self.render.ctx.set_source_rgba(*FRONT)
-    for i in xrange(num):
-
-      # nc = self.num_edges[i]
-      # if nc>0:
-        # t = tile(i, nc)
-        # origin = xy[t,:]
-        # stop = xy[self.edges[i,:nc],:]
-        # self.render.sandstroke(column_stack([origin, stop]), grains=5)
-
-      if cand_flag[i]:
-        self.render.ctx.set_source_rgba(*CYAN)
-      else:
-        self.render.ctx.set_source_rgba(*FRONT)
-      arc(xy[i,0], xy[i,1], 0.5*node_rad, 0, TWOPI)
-      fill()
-
-      self.render.ctx.set_source_rgba(*FRONT)
-      nc = self.num_edges[i]
-      for j in xrange(nc):
-        c = self.edges[i,j]
-
-        move_to(xy[i,0], xy[i,1])
-        line_to(xy[c,0], xy[c,1])
-        stroke()
 
