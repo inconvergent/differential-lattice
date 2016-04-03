@@ -7,9 +7,10 @@ from numpy import any
 from numpy import array
 from numpy import logical_and
 from numpy import logical_or
-from numpy import tile
+from numpy import logical_not
 from numpy import max
 from numpy import mean
+from numpy import sum
 from numpy import arange
 from numpy import zeros
 from numpy import column_stack
@@ -38,8 +39,8 @@ class DifferentialLattice(object):
       stp,
       spring_stp,
       reject_stp,
+      attract_stp,
       max_capacity,
-      min_capacity,
       cand_count_limit,
       capacity_cool_down,
       node_rad,
@@ -51,6 +52,9 @@ class DifferentialLattice(object):
 
     self.itt = 0
 
+    from timers import named_sub_timers
+
+    self.t = named_sub_timers('dl')
 
     self.nmax = nmax
     self.size = size
@@ -58,9 +62,9 @@ class DifferentialLattice(object):
 
     self.stp = stp
     self.spring_stp = spring_stp
+    self.attract_stp = attract_stp
     self.reject_stp = reject_stp
     self.max_capacity = max_capacity
-    self.min_capacity = min_capacity
     self.cand_count_limit = cand_count_limit
     self.capacity_cool_down = capacity_cool_down
     self.node_rad = node_rad
@@ -81,6 +85,8 @@ class DifferentialLattice(object):
     self.edges = zeros((nmax, self.max_capacity), 'int')
     self.capacities = zeros((nmax, 1), 'int') + self.max_capacity
     self.num_edges = zeros((nmax, 1), 'int')
+
+    self.intensity = zeros((nmax, 1), 'float')
 
     self.potential = zeros((nmax, 1), 'bool')
     self.cand_count = zeros((nmax, 1), 'int')
@@ -111,28 +117,28 @@ class DifferentialLattice(object):
     if new_num>0:
       new_xy = self.xy[selected,:]
       theta = random(new_num)*TWOPI
-      offset = column_stack([cos(theta), sin(theta)])*self.node_rad*0.05
+      offset = column_stack([cos(theta), sin(theta)])*self.node_rad*0.5
       self.xy[num:num+new_num,:] = new_xy+offset
       self.num += new_num
       return new_num
 
     return 0
 
-  def is_connected(self, a, b):
+  def __is_connected(self, a, b):
 
     if self.num_edges[a] < 1 or self.num_edges[b] < 1:
       return False
 
     return any(self.edges[a,:self.num_edges[a]] == b)
 
-  def connect(self, a, b):
+  def __connect(self, a, b):
 
     self.edges[a,self.num_edges[a]] = b
     self.edges[b,self.num_edges[b]] = a
     self.num_edges[a] += 1
     self.num_edges[b] += 1
 
-  def disconnect(self, a, b):
+  def __disconnect(self, a, b):
 
     na = self.num_edges[a]
     nb = self.num_edges[b]
@@ -187,16 +193,18 @@ class DifferentialLattice(object):
           break
         if self.num_edges[c]>=self.max_capacity:
           continue
-        if self.is_connected(i, c):
+        if self.__is_connected(i, c):
           continue
         if rel[j]:
-          self.connect(i, c)
+          self.__connect(i, c)
 
     self.potential[:num,0] = self.num_edges[:num,0] < self.capacities[:num,0]
 
   def forces(self):
 
+
     num = self.num
+    outer_influence_rad = self.outer_influence_rad
     xy = self.xy
     edges = self.edges
     num_edges = self.num_edges
@@ -205,45 +213,64 @@ class DifferentialLattice(object):
 
     dxy[:num,:] = 0
 
+    # self.t.start()
+
     candidate_sets = self.tree.query_ball_point(
       self.xy[:num,:],
       self.outer_influence_rad
     )
 
-    for i in xrange(self.num):
+    # self.t.t('query')
+
+    for i in xrange(num):
       ne = num_edges[i]
-      e = edges[i,:ne]
-
-      # connected
-      if ne>0:
-        dx = xy[e,:]-xy[i,:]
-        dd = norm(dx, axis=1)
-        reject = dd<self.node_rad*1.8
-        mid = logical_or(
-          dd<self.node_rad*1.8,
-          dd>self.node_rad*2.2
-        )
-        if any(mid):
-          dx /= reshape(dd,(-1,1))
-          dx[reject] *= -1
-          dxy[i,:] += reshape(mean(dx[mid,:], axis=0), 2)*self.spring_stp
-
-      # unconnected
-      out = set([i]+list(e))
-      cands = [c for c in candidate_sets[i] if c not in out]
+      ee = set(edges[i,:ne])
+      cands = array(candidate_sets[i], 'int')
       nc = len(cands)
-      if nc>1:
+      no = nc-ne
 
-        inv = ones(nc, 'float')
-        if potential[i]:
-          inv[potential[cands,0]] = -1
+      connected_mask = array([c in ee for c in cands], 'bool')
+      unconnected_mask = logical_not(connected_mask)
+      connected_inds = connected_mask.nonzero()[0]
+      unconnected_inds = unconnected_mask.nonzero()[0]
 
-        dx = xy[i,:]-xy[cands,:]
-        dd = norm(dx, axis=1)
-        force = (self.outer_influence_rad-dd)/self.outer_influence_rad
-        dx *= reshape(inv*force/dd,(-1,1))
-        dxy[i,:] += reshape(mean(dx, axis=0), 2)*self.reject_stp
+      scale = zeros((nc,1), 'float')
+      dx = xy[cands,:]-xy[i,:]
+      dd = norm(dx, axis=1)
+      dd[dd<=0] = 1000000.0
+      dx /= reshape(dd,(-1,1))
 
+      scale[connected_inds] = self.spring_stp/ne
+      m = dd[connected_inds]<self.node_rad*1.8
+      scale[connected_inds[m]] = -self.spring_stp/ne
+
+      inv = -ones(nc, 'float')*self.reject_stp
+      if potential[i]:
+        inv[logical_and(potential[cands,0],unconnected_mask)] = self.attract_stp
+
+      force = inv[unconnected_inds]*(
+          outer_influence_rad-dd[unconnected_inds]
+        )/outer_influence_rad
+
+      scale[unconnected_inds,0] = force*self.reject_stp/no
+
+      # mid = logical_and(
+        # dd>self.node_rad*1.8,
+        # dd<self.node_rad*2.2
+      # )
+
+      mid = logical_and(
+        connected_mask,
+        logical_and(
+          dd>self.node_rad*1.8,
+          dd<self.node_rad*2.2
+        )
+      )
+
+      scale[mid,0] = 0
+
+      dxy[i,:] += reshape(sum(dx*scale, axis=0), 2)
+
+    # print(dxy[:num,:].max())
     xy[:num,:] += dxy[:num,:]*self.stp
-
 

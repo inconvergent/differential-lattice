@@ -4,33 +4,42 @@
 
 from __future__ import print_function
 
-from numpy import array
 
 
 
+def get_step():
 
-def step(dl):
+  from modules.timers import named_sub_timers
 
-  dl.structure()
-  dl.cand_spawn(ratio=0.1)
+  t = named_sub_timers('timer')
 
-  for i in xrange(10):
-    dl.forces()
+  def step(dl):
 
-  return True
+    t.start()
 
-def get_wrap(dl):
+    dl.structure()
+    dl.cand_spawn(ratio=0.1)
+    t.t('structure')
 
+    for i in xrange(10):
+      dl.forces()
+    t.t('forces')
+    t.p()
+
+    return True
+
+  return step
+
+def get_wrap(dl, colors):
 
   from numpy import pi
   twopi = pi*2
 
   xy = dl.xy
+  cand_count = dl.cand_count
+  edges = dl.edges
 
-  back = [1,1,1,1]
-  front = [0,0,0,0.5]
-  cyan = [0,0.6,0.6,0.5]
-  light = [0,0,0,0.05]
+  step = get_step()
 
   def wrap(render):
 
@@ -46,29 +55,29 @@ def get_wrap(dl):
 
     render.clear_canvas()
 
-    cand_flag = dl.cand_count[:num,0] < dl.cand_count_limit
+    cand_flag = cand_count[:num,0] < dl.cand_count_limit
 
-    render.ctx.set_source_rgba(*light)
+    render.ctx.set_source_rgba(*colors['light'])
     for i in xrange(num):
 
       # nc = self.num_edges[i]
       # if nc>0:
         # t = tile(i, nc)
         # origin = xy[t,:]
-        # stop = xy[self.edges[i,:nc],:]
+        # stop = xy[edges[i,:nc],:]
         # self.render.sandstroke(column_stack([origin, stop]), grains=5)
 
       if cand_flag[i]:
-        render.ctx.set_source_rgba(*cyan)
+        render.ctx.set_source_rgba(*colors['cyan'])
       else:
-        render.ctx.set_source_rgba(*front)
-      arc(xy[i,0], xy[i,1], 0.5*dl.node_rad, 0, twopi)
+        render.ctx.set_source_rgba(*colors['light'])
+      arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
       fill()
 
-      render.ctx.set_source_rgba(*front)
+      render.ctx.set_source_rgba(*colors['front'])
       nc = dl.num_edges[i]
       for j in xrange(nc):
-        c = dl.edges[i,j]
+        c = edges[i,j]
 
         move_to(xy[i,0], xy[i,1])
         line_to(xy[c,0], xy[c,1])
@@ -82,30 +91,36 @@ def get_wrap(dl):
 
 def main():
 
+  from numpy import array
   from modules.differentialLattice import DifferentialLattice
   from render.render import Animate
   from fn import Fn
 
-  back = [1,1,1,1]
-  front = [0,0,0,0.5]
+  colors = {
+    'back': [1,1,1,1],
+    'front': [0,0,0,0.5],
+    'cyan': [0,0.6,0.6,0.3],
+    'light': [0,0,0,0.3],
+  }
 
-  size = 500
+  size = 1200
   one = 1.0/size
 
-  stp = 4e-4
-  spring_stp = 1.0
-  reject_stp = 1.0
+  # stp = 5e-6
+  stp = 1e-4
+  spring_stp = 1
+  reject_stp = 1
+  attract_stp = reject_stp
 
-  max_capacity = 5
-  min_capacity = 3
+  max_capacity = 6
 
-  cand_count_limit = 4
+  cand_count_limit = 5
   capacity_cool_down = 15
 
-  node_rad = 7*one
-  disconnect_rad = 2*node_rad
-  inner_influence_rad = 2*node_rad
-  outer_influence_rad = 20*node_rad
+  node_rad = 7.0*one
+  disconnect_rad = 2.0*node_rad
+  inner_influence_rad = 2.0*node_rad
+  outer_influence_rad = 8.0*node_rad
 
 
   fn = Fn(prefix='./res/', postfix='.png')
@@ -115,8 +130,8 @@ def main():
     stp,
     spring_stp,
     reject_stp,
+    attract_stp,
     max_capacity,
-    min_capacity,
     cand_count_limit,
     capacity_cool_down,
     node_rad,
@@ -125,11 +140,10 @@ def main():
     outer_influence_rad
   )
 
-  DL.spawn(100, xy=array([[0.75,0.5]]),dst=node_rad*0.8, rad=0.1)
+  DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.1)
   DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.3)
 
-
-  render = Animate(size, back, front, get_wrap(DL))
+  render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors))
   render.start()
 
 
