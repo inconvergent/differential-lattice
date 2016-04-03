@@ -46,7 +46,6 @@ class DifferentialLattice(object):
       disconnect_rad,
       inner_influence_rad,
       outer_influence_rad,
-      repeats = 10,
       nmax = 1000000
     ):
 
@@ -56,8 +55,6 @@ class DifferentialLattice(object):
     self.nmax = nmax
     self.size = size
     self.one = 1.0/size
-
-    self.repeats = repeats
 
     self.stp = stp
     self.spring_stp = spring_stp
