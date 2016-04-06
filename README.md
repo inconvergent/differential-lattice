@@ -18,6 +18,9 @@ The code also depends on:
 *    `numpy`
 *    `python-cairo` (do not install with pip, this generally does not work)
 
+
+if cuda is not working try `sudo ldconfig`. and check $LD_LIBRARY_PATH
+
 -----------
 http://inconvergent.net
 

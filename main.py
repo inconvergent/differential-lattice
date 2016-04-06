@@ -18,11 +18,12 @@ def get_step():
     t.start()
 
     dl.structure()
-    dl.cand_spawn(ratio=0.1)
     t.t('structure')
+    dl.cand_spawn(ratio=0.01)
+    t.t('spawn')
 
-    for i in xrange(10):
-      dl.forces()
+    # for i in xrange(10):
+    dl.forces()
     t.t('forces')
     t.p()
 
@@ -33,17 +34,23 @@ def get_step():
 def get_wrap(dl, colors):
 
   from numpy import pi
+  from fn import Fn
   twopi = pi*2
 
   xy = dl.xy
   cand_count = dl.cand_count
   edges = dl.edges
 
+  fn = Fn(prefix='./res/', postfix='.png')
+
   step = get_step()
 
   def wrap(render):
 
     res = step(dl)
+
+    if not dl.itt % 20 == 0:
+      return res
 
     num = dl.num
     render.set_line_width(dl.one)
@@ -67,12 +74,12 @@ def get_wrap(dl, colors):
         # stop = xy[edges[i,:nc],:]
         # self.render.sandstroke(column_stack([origin, stop]), grains=5)
 
-      if cand_flag[i]:
-        render.ctx.set_source_rgba(*colors['cyan'])
-      else:
-        render.ctx.set_source_rgba(*colors['light'])
-      arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
-      fill()
+      # if cand_flag[i]:
+        # render.ctx.set_source_rgba(*colors['cyan'])
+      # else:
+        # render.ctx.set_source_rgba(*colors['light'])
+      # arc(xy[i,0], xy[i,1], dl.one*1, 0, twopi)
+      # fill()
 
       render.ctx.set_source_rgba(*colors['front'])
       nc = dl.num_edges[i]
@@ -82,6 +89,8 @@ def get_wrap(dl, colors):
         move_to(xy[i,0], xy[i,1])
         line_to(xy[c,0], xy[c,1])
         stroke()
+
+    # render.write_to_png(fn.name())
 
     return res
 
@@ -108,8 +117,8 @@ def main():
 
   # stp = 5e-6
   stp = 1e-4
-  spring_stp = 1
-  reject_stp = 1
+  spring_stp = 1.0
+  reject_stp = 1.0
   attract_stp = reject_stp
 
   max_capacity = 6
@@ -117,13 +126,12 @@ def main():
   cand_count_limit = 5
   capacity_cool_down = 15
 
-  node_rad = 7.0*one
+  node_rad = 3.0*one
   disconnect_rad = 2.0*node_rad
   inner_influence_rad = 2.0*node_rad
   outer_influence_rad = 8.0*node_rad
 
 
-  fn = Fn(prefix='./res/', postfix='.png')
 
   DL = DifferentialLattice(
     size,
@@ -140,8 +148,8 @@ def main():
     outer_influence_rad
   )
 
-  DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.1)
-  DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.3)
+  DL.spawn(1000, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.2)
+  # DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.3)
 
   render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors))
   render.start()

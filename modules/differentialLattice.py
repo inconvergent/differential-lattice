@@ -2,6 +2,9 @@
 
 from __future__ import print_function
 
+import pycuda.autoinit
+import pycuda.driver as drv
+
 from numpy import pi
 from numpy import any
 from numpy import array
@@ -23,6 +26,14 @@ from numpy.random import random
 from numpy.linalg import norm
 from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree as kdt
+
+from numpy import float32
+from numpy import int32
+
+
+npfloat = float32
+npint = int32
+
 
 
 
@@ -52,12 +63,15 @@ class DifferentialLattice(object):
 
     self.itt = 0
 
+    self.threads = 256
+
     from timers import named_sub_timers
 
     self.t = named_sub_timers('dl')
 
     self.nmax = nmax
     self.size = size
+
     self.one = 1.0/size
 
     self.stp = stp
@@ -73,20 +87,120 @@ class DifferentialLattice(object):
     self.outer_influence_rad = outer_influence_rad
 
     self.__init()
+    self.__cuda_init()
+
+  def __cuda_init(self):
+
+    from pycuda.compiler import SourceModule
+
+    mod = SourceModule('''
+      __global__ void step(
+        int n,
+        float *dest,
+        int *first,
+        int *num,
+        int *link,
+        int *map,
+        int *potential,
+        float *xy,
+        float stp,
+        float reject_stp,
+        float attract_stp,
+        float spring_stp,
+        float node_rad
+      ){
+        const int i = blockIdx.x*256 + threadIdx.x;
+
+        if (i>=n) {
+          return;
+        }
+
+        float sx = 0;
+        float sy = 0;
+
+        float dx = 0;
+        float dy = 0;
+        float dd = 0;
+
+        int f;
+        int j;
+
+        const int ii = 2*i;
+        int jj;
+
+        for (int k=0;k<num[i];k++){
+
+          f = link[first[i]+k];
+          j = map[first[i]+k];
+          jj = 2*j;
+
+          dx = xy[ii] - xy[jj];
+          dy = xy[ii+1] - xy[jj+1];
+          dd = sqrt(dx*dx + dy*dy);
+
+          if (dd>0.0){
+
+            dx /= dd;
+            dy /= dd;
+
+            if (f>0){
+              // linked
+
+              if (dd>node_rad*1.8){
+                // attract
+                sx += -dx*spring_stp;
+                sy += -dy*spring_stp;
+              }
+              else if(dd<node_rad){
+                // reject
+                sx += dx*reject_stp;
+                sy += dy*reject_stp;
+              }
+            }
+            else{
+              // unlinked
+              if (potential[i]>0){
+                // attract
+                sx += -dx*attract_stp;
+                sy += -dy*attract_stp;
+              }
+              else{
+                // reject
+                sx += dx*reject_stp;
+                sy += dy*reject_stp;
+              }
+            }
+            sx += dx;
+            sy += dy;
+          }
+
+        }
+
+        dest[ii] = xy[ii] + sx*stp;
+        dest[ii+1] = xy[ii+1] + sy*stp;
+
+      }
+    ''')
+
+    self.cuda_step = mod.get_function('step')
 
   def __init(self):
 
     self.num = 0
     nmax = self.nmax
 
-    self.xy = zeros((nmax, 2), 'float')
-    self.dxy = zeros((nmax, 2), 'float')
+    self.xy = zeros((nmax, 2), npfloat)
+    self.dxy = zeros((nmax, 2), npfloat)
     self.cool_down = zeros((nmax, 1), 'int')
     self.edges = zeros((nmax, self.max_capacity), 'int')
     self.capacities = zeros((nmax, 1), 'int') + self.max_capacity
     self.num_edges = zeros((nmax, 1), 'int')
 
-    self.intensity = zeros((nmax, 1), 'float')
+    self.link_num = zeros((nmax, 1), npint)
+    self.link_map = zeros((nmax, 1), npint)
+    self.link_first = zeros((nmax, 1), npint)
+
+    self.intensity = zeros((nmax, 1), npfloat)
 
     self.potential = zeros((nmax, 1), 'bool')
     self.cand_count = zeros((nmax, 1), 'int')
@@ -167,9 +281,13 @@ class DifferentialLattice(object):
     uv = dists[:-1,:-1]
     us = dists[:-1,-1]
     mas = max(uv, axis=0)
+
     return us<mas
 
   def structure(self):
+
+    from numpy import concatenate
+    from numpy import cumsum
 
     num = self.num
 
@@ -182,11 +300,13 @@ class DifferentialLattice(object):
     )
 
     self.cand_count[:num,0] = [len(c) for c in candidate_sets]
+    rels = []
 
     for i, cands in enumerate(candidate_sets):
 
       cands = [c for c in cands if c != i]
       rel = self.__is_relative_neighbor(i, cands)
+      rels.append(rel)
 
       for j,c in enumerate(cands):
         if self.num_edges[i]>=self.max_capacity:
@@ -198,79 +318,36 @@ class DifferentialLattice(object):
         if rel[j]:
           self.__connect(i, c)
 
+    self.link_num[:num,0] = self.cand_count[:num,0]
+    self.link_map = concatenate(candidate_sets).astype(npint)
+    self.link_link = concatenate(rels).astype(npint)
+    self.link_first[1:num,0] = cumsum(self.link_num[:num-1])
+
     self.potential[:num,0] = self.num_edges[:num,0] < self.capacities[:num,0]
 
   def forces(self):
 
+    self.itt += 1
 
     num = self.num
-    outer_influence_rad = self.outer_influence_rad
     xy = self.xy
-    edges = self.edges
-    num_edges = self.num_edges
-    potential = self.potential[:num,:]
-    dxy = self.dxy
 
-    dxy[:num,:] = 0
-
-    # self.t.start()
-
-    candidate_sets = self.tree.query_ball_point(
-      self.xy[:num,:],
-      self.outer_influence_rad
+    blocks = (num)//self.threads + 1
+    self.cuda_step(
+      npint(num),
+      drv.Out(xy[:num,:]),
+      drv.In(self.link_first[:num,0]),
+      drv.In(self.link_num[:num,0]),
+      drv.In(self.link_link),
+      drv.In(self.link_map),
+      drv.In(self.potential[:num,0].astype(npint)),
+      drv.In(xy[:num,:]),
+      npfloat(self.stp),
+      npfloat(self.reject_stp),
+      npfloat(self.attract_stp),
+      npfloat(self.spring_stp),
+      npfloat(self.node_rad),
+      block=(self.threads,1,1),
+      grid=(blocks,1)
     )
-
-    # self.t.t('query')
-
-    for i in xrange(num):
-      ne = num_edges[i]
-      ee = set(edges[i,:ne])
-      cands = array(candidate_sets[i], 'int')
-      nc = len(cands)
-      no = nc-ne
-
-      connected_mask = array([c in ee for c in cands], 'bool')
-      unconnected_mask = logical_not(connected_mask)
-      connected_inds = connected_mask.nonzero()[0]
-      unconnected_inds = unconnected_mask.nonzero()[0]
-
-      scale = zeros((nc,1), 'float')
-      dx = xy[cands,:]-xy[i,:]
-      dd = norm(dx, axis=1)
-      dd[dd<=0] = 1000000.0
-      dx /= reshape(dd,(-1,1))
-
-      scale[connected_inds] = self.spring_stp/ne
-      m = dd[connected_inds]<self.node_rad*1.8
-      scale[connected_inds[m]] = -self.spring_stp/ne
-
-      inv = -ones(nc, 'float')*self.reject_stp
-      if potential[i]:
-        inv[logical_and(potential[cands,0],unconnected_mask)] = self.attract_stp
-
-      force = inv[unconnected_inds]*(
-          outer_influence_rad-dd[unconnected_inds]
-        )/outer_influence_rad
-
-      scale[unconnected_inds,0] = force*self.reject_stp/no
-
-      # mid = logical_and(
-        # dd>self.node_rad*1.8,
-        # dd<self.node_rad*2.2
-      # )
-
-      mid = logical_and(
-        connected_mask,
-        logical_and(
-          dd>self.node_rad*1.8,
-          dd<self.node_rad*2.2
-        )
-      )
-
-      scale[mid,0] = 0
-
-      dxy[i,:] += reshape(sum(dx*scale, axis=0), 2)
-
-    # print(dxy[:num,:].max())
-    xy[:num,:] += dxy[:num,:]*self.stp
 
