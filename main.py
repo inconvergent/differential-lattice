@@ -22,10 +22,8 @@ def get_step():
     dl.cand_spawn(ratio=0.01)
     t.t('spawn')
 
-    # for i in xrange(10):
     dl.forces()
     t.t('forces')
-    t.p()
 
     return True
 
@@ -39,7 +37,6 @@ def get_wrap(dl, colors):
 
   xy = dl.xy
   cand_count = dl.cand_count
-  edges = dl.edges
 
   fn = Fn(prefix='./res/', postfix='.png')
 
@@ -49,16 +46,14 @@ def get_wrap(dl, colors):
 
     res = step(dl)
 
-    if not dl.itt % 20 == 0:
+    if dl.itt % 20 == 0:
+      print('itt', dl.itt, 'num', dl.num)
       return res
 
     num = dl.num
     render.set_line_width(dl.one)
     arc = render.ctx.arc
-    stroke = render.ctx.stroke
     fill = render.ctx.fill
-    move_to = render.ctx.move_to
-    line_to = render.ctx.line_to
 
     render.clear_canvas()
 
@@ -67,28 +62,14 @@ def get_wrap(dl, colors):
     render.ctx.set_source_rgba(*colors['light'])
     for i in xrange(num):
 
-      # nc = self.num_edges[i]
-      # if nc>0:
-        # t = tile(i, nc)
-        # origin = xy[t,:]
-        # stop = xy[edges[i,:nc],:]
-        # self.render.sandstroke(column_stack([origin, stop]), grains=5)
 
-      # if cand_flag[i]:
-        # render.ctx.set_source_rgba(*colors['cyan'])
-      # else:
-        # render.ctx.set_source_rgba(*colors['light'])
-      # arc(xy[i,0], xy[i,1], dl.one*1, 0, twopi)
-      # fill()
+      if cand_flag[i]:
+        render.ctx.set_source_rgba(*colors['cyan'])
+      else:
+        render.ctx.set_source_rgba(*colors['light'])
+      arc(xy[i,0], xy[i,1], dl.one*2.5, 0, twopi)
+      fill()
 
-      render.ctx.set_source_rgba(*colors['front'])
-      nc = dl.num_edges[i]
-      for j in xrange(nc):
-        c = edges[i,j]
-
-        move_to(xy[i,0], xy[i,1])
-        line_to(xy[c,0], xy[c,1])
-        stroke()
 
     # render.write_to_png(fn.name())
 
@@ -107,9 +88,9 @@ def main():
 
   colors = {
     'back': [1,1,1,1],
-    'front': [0,0,0,0.5],
-    'cyan': [0,0.6,0.6,0.3],
-    'light': [0,0,0,0.3],
+    'front': [0,0,0,0.7],
+    'cyan': [0,0.6,0.6,0.6],
+    'light': [0,0,0,0.6],
   }
 
   size = 1200
@@ -124,7 +105,6 @@ def main():
   max_capacity = 6
 
   cand_count_limit = 5
-  capacity_cool_down = 15
 
   node_rad = 3.0*one
   disconnect_rad = 2.0*node_rad
@@ -141,15 +121,13 @@ def main():
     attract_stp,
     max_capacity,
     cand_count_limit,
-    capacity_cool_down,
     node_rad,
     disconnect_rad,
     inner_influence_rad,
     outer_influence_rad
   )
 
-  DL.spawn(1000, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.2)
-  # DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.3)
+  DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.2)
 
   render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors))
   render.start()

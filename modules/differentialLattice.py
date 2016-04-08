@@ -53,7 +53,6 @@ class DifferentialLattice(object):
       attract_stp,
       max_capacity,
       cand_count_limit,
-      capacity_cool_down,
       node_rad,
       disconnect_rad,
       inner_influence_rad,
@@ -64,10 +63,6 @@ class DifferentialLattice(object):
     self.itt = 0
 
     self.threads = 256
-
-    from timers import named_sub_timers
-
-    self.t = named_sub_timers('dl')
 
     self.nmax = nmax
     self.size = size
@@ -80,7 +75,6 @@ class DifferentialLattice(object):
     self.reject_stp = reject_stp
     self.max_capacity = max_capacity
     self.cand_count_limit = cand_count_limit
-    self.capacity_cool_down = capacity_cool_down
     self.node_rad = node_rad
     self.disconnect_rad = disconnect_rad
     self.inner_influence_rad = inner_influence_rad
@@ -191,9 +185,6 @@ class DifferentialLattice(object):
 
     self.xy = zeros((nmax, 2), npfloat)
     self.dxy = zeros((nmax, 2), npfloat)
-    self.cool_down = zeros((nmax, 1), 'int')
-    self.edges = zeros((nmax, self.max_capacity), 'int')
-    self.capacities = zeros((nmax, 1), 'int') + self.max_capacity
     self.num_edges = zeros((nmax, 1), 'int')
 
     self.link_num = zeros((nmax, 1), npint)
@@ -207,9 +198,7 @@ class DifferentialLattice(object):
 
   def spawn(self, n, xy, dst, rad=0.4):
 
-    # from dddUtils.random import darts
     num = self.num
-    # new_xy = darts(n, 0.5, 0.5, rad, dst)
     theta = random(n)*TWOPI
     new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
     new_num = len(new_xy)
@@ -238,36 +227,6 @@ class DifferentialLattice(object):
 
     return 0
 
-  def __is_connected(self, a, b):
-
-    if self.num_edges[a] < 1 or self.num_edges[b] < 1:
-      return False
-
-    return any(self.edges[a,:self.num_edges[a]] == b)
-
-  def __connect(self, a, b):
-
-    self.edges[a,self.num_edges[a]] = b
-    self.edges[b,self.num_edges[b]] = a
-    self.num_edges[a] += 1
-    self.num_edges[b] += 1
-
-  def __disconnect(self, a, b):
-
-    na = self.num_edges[a]
-    nb = self.num_edges[b]
-
-    for i,e in enumerate(self.edges[a,:na]):
-      if e == b:
-       self.edges[a,i] = self.edges[a,na-1]
-
-    for i,e in enumerate(self.edges[b,:nb]):
-      if e == a:
-       self.edges[b,i] = self.edges[b,nb-1]
-
-    self.num_edges[a] -= 1
-    self.num_edges[b] -= 1
-
   def __is_relative_neighbor(self, i, cands):
 
     if len(cands)<2:
@@ -292,7 +251,9 @@ class DifferentialLattice(object):
     num = self.num
 
     self.tree = kdt(self.xy[:self.num,:])
-    self.num_edges[:num,0] = 0
+    # self.num_edges[:num,0] = 0
+
+    num_edges = self.num_edges
 
     candidate_sets = self.tree.query_ball_point(
       self.xy[:num,:],
@@ -307,23 +268,14 @@ class DifferentialLattice(object):
       cands = [c for c in cands if c != i]
       rel = self.__is_relative_neighbor(i, cands)
       rels.append(rel)
-
-      for j,c in enumerate(cands):
-        if self.num_edges[i]>=self.max_capacity:
-          break
-        if self.num_edges[c]>=self.max_capacity:
-          continue
-        if self.__is_connected(i, c):
-          continue
-        if rel[j]:
-          self.__connect(i, c)
+      num_edges[i,0] = sum(rel)
 
     self.link_num[:num,0] = self.cand_count[:num,0]
     self.link_map = concatenate(candidate_sets).astype(npint)
     self.link_link = concatenate(rels).astype(npint)
     self.link_first[1:num,0] = cumsum(self.link_num[:num-1])
 
-    self.potential[:num,0] = self.num_edges[:num,0] < self.capacities[:num,0]
+    self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
 
   def forces(self):
 
