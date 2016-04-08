@@ -3,33 +3,28 @@
 
 
 from __future__ import print_function
+from modules.timers import named_sub_timers
 
 
 
 
-def get_step():
-
-  from modules.timers import named_sub_timers
-
-  t = named_sub_timers('timer')
+def get_step(t):
 
   def step(dl):
 
-    t.start()
-
     dl.structure()
-    t.t('structure')
-    dl.cand_spawn(ratio=0.01)
-    t.t('spawn')
+    t.t('str')
+    dl.cand_spawn(ratio=0.05)
+    t.t('spw')
 
     dl.forces()
-    t.t('forces')
+    t.t('frc')
 
     return True
 
   return step
 
-def get_wrap(dl, colors):
+def get_wrap(dl, colors, t):
 
   from numpy import pi
   from fn import Fn
@@ -40,16 +35,17 @@ def get_wrap(dl, colors):
 
   fn = Fn(prefix='./res/', postfix='.png')
 
-  step = get_step()
+  step = get_step(t)
 
   def wrap(render):
 
     res = step(dl)
 
-    if dl.itt % 20 == 0:
-      print('itt', dl.itt, 'num', dl.num)
+    if dl.itt % 10 != 0:
       return res
 
+    print('itt', dl.itt, 'num', dl.num)
+    t.p()
     num = dl.num
     render.set_line_width(dl.one)
     arc = render.ctx.arc
@@ -67,11 +63,11 @@ def get_wrap(dl, colors):
         render.ctx.set_source_rgba(*colors['cyan'])
       else:
         render.ctx.set_source_rgba(*colors['light'])
-      arc(xy[i,0], xy[i,1], dl.one*2.5, 0, twopi)
+      arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
       fill()
 
 
-    # render.write_to_png(fn.name())
+    render.write_to_png(fn.name())
 
     return res
 
@@ -84,7 +80,6 @@ def main():
   from numpy import array
   from modules.differentialLattice import DifferentialLattice
   from render.render import Animate
-  from fn import Fn
 
   colors = {
     'back': [1,1,1,1],
@@ -93,7 +88,7 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 1200
+  size = 500
   one = 1.0/size
 
   # stp = 5e-6
@@ -111,6 +106,8 @@ def main():
   inner_influence_rad = 2.0*node_rad
   outer_influence_rad = 8.0*node_rad
 
+  t = named_sub_timers('dl')
+
 
 
   DL = DifferentialLattice(
@@ -127,9 +124,9 @@ def main():
     outer_influence_rad
   )
 
-  DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.2)
+  DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.1)
 
-  render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors))
+  render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors, t))
   render.start()
 
 

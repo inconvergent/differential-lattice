@@ -6,13 +6,16 @@ import pycuda.autoinit
 import pycuda.driver as drv
 
 from numpy import pi
-from numpy import any
-from numpy import array
-from numpy import logical_and
-from numpy import logical_or
-from numpy import logical_not
+
+from numpy import concatenate
+from numpy import cumsum
+# from numpy import any
+# from numpy import array
+# from numpy import logical_and
+# from numpy import logical_or
+# from numpy import logical_not
 from numpy import max
-from numpy import mean
+# from numpy import mean
 from numpy import sum
 from numpy import arange
 from numpy import zeros
@@ -20,10 +23,9 @@ from numpy import column_stack
 from numpy import sin
 from numpy import cos
 from numpy import ones
-from numpy import reshape
+# from numpy import reshape
 
 from numpy.random import random
-from numpy.linalg import norm
 from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree as kdt
 
@@ -31,15 +33,14 @@ from numpy import float32
 from numpy import int32
 
 
+TWOPI = pi*2
+PI = pi
+HPI = pi*0.5
+
 npfloat = float32
 npint = int32
 
 
-
-
-TWOPI = pi*2
-PI = pi
-HPI = pi*0.5
 
 
 class DifferentialLattice(object):
@@ -90,13 +91,12 @@ class DifferentialLattice(object):
     mod = SourceModule('''
       __global__ void step(
         int n,
-        float *dest,
+        float *xy,
         int *first,
         int *num,
         int *link,
         int *map,
         int *potential,
-        float *xy,
         float stp,
         float reject_stp,
         float attract_stp,
@@ -153,7 +153,7 @@ class DifferentialLattice(object):
             }
             else{
               // unlinked
-              if (potential[i]>0){
+              if (potential[i]>0 && potential[j]>0){
                 // attract
                 sx += -dx*attract_stp;
                 sy += -dy*attract_stp;
@@ -170,8 +170,10 @@ class DifferentialLattice(object):
 
         }
 
-        dest[ii] = xy[ii] + sx*stp;
-        dest[ii+1] = xy[ii+1] + sy*stp;
+        __syncthreads();
+
+        xy[ii] = xy[ii] + sx*stp;
+        xy[ii+1] = xy[ii+1] + sy*stp;
 
       }
     ''')
@@ -193,7 +195,7 @@ class DifferentialLattice(object):
 
     self.intensity = zeros((nmax, 1), npfloat)
 
-    self.potential = zeros((nmax, 1), 'bool')
+    self.potential = zeros((nmax, 1), npint)
     self.cand_count = zeros((nmax, 1), 'int')
 
   def spawn(self, n, xy, dst, rad=0.4):
@@ -245,26 +247,19 @@ class DifferentialLattice(object):
 
   def structure(self):
 
-    from numpy import concatenate
-    from numpy import cumsum
-
     num = self.num
-
-    self.tree = kdt(self.xy[:self.num,:])
-    # self.num_edges[:num,0] = 0
-
     num_edges = self.num_edges
+    cand_count = self.cand_count
+    rels = []
 
-    candidate_sets = self.tree.query_ball_point(
+    candidate_sets = kdt(self.xy[:self.num,:]).query_ball_point(
       self.xy[:num,:],
       self.disconnect_rad
     )
 
-    self.cand_count[:num,0] = [len(c) for c in candidate_sets]
-    rels = []
-
     for i, cands in enumerate(candidate_sets):
 
+      cand_count[i,0] = len(cands)
       cands = [c for c in cands if c != i]
       rel = self.__is_relative_neighbor(i, cands)
       rels.append(rel)
@@ -287,13 +282,12 @@ class DifferentialLattice(object):
     blocks = (num)//self.threads + 1
     self.cuda_step(
       npint(num),
-      drv.Out(xy[:num,:]),
+      drv.InOut(xy[:num,:]),
       drv.In(self.link_first[:num,0]),
       drv.In(self.link_num[:num,0]),
       drv.In(self.link_link),
       drv.In(self.link_map),
-      drv.In(self.potential[:num,0].astype(npint)),
-      drv.In(xy[:num,:]),
+      drv.In(self.potential[:num,0]),
       npfloat(self.stp),
       npfloat(self.reject_stp),
       npfloat(self.attract_stp),
