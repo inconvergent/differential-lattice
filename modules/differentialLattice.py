@@ -15,7 +15,7 @@ from numpy import cumsum
 # from numpy import logical_or
 # from numpy import logical_not
 from numpy import max
-# from numpy import mean
+from numpy import mean
 from numpy import sum
 from numpy import arange
 from numpy import zeros
@@ -94,10 +94,7 @@ class DifferentialLattice(object):
     self.link_map = zeros((nmax, 1), npint)
     self.link_first = zeros((nmax, 1), npint)
 
-    # self.intensity = zeros((nmax, 1), npfloat)
-
     self.potential = zeros((nmax, 1), npint)
-    self.cand_count = zeros((nmax, 1), npint)
 
   def __cuda_init(self):
 
@@ -150,6 +147,7 @@ class DifferentialLattice(object):
           dy = xy[ii+1] - xy[jj+1];
           dd = sqrt(dx*dx + dy*dy);
 
+          // TODO: there is something seriously wrong here
           vu_dst = -1.0;
           for (int l=0;l<num[i];l++){
             aa = 2*map[first[i]+l];
@@ -169,6 +167,7 @@ class DifferentialLattice(object):
             dy /= dd;
 
             if ( dd<=vu_dst){
+            //if ( dd<=3){
               // linked
 
               count += 1;
@@ -268,7 +267,6 @@ class DifferentialLattice(object):
 
     num = self.num
     xy = self.xy
-    cand_count = self.cand_count
 
     candidate_sets = kdt(xy[:num,:]).query_ball_point(
       xy[:num,:],
@@ -278,12 +276,10 @@ class DifferentialLattice(object):
     if t:
       t.t('kdt')
 
-    cand_count[:num,0] = [len(c) for c in candidate_sets]
-
     if t:
       t.t('for')
 
-    self.link_num[:num,0] = self.cand_count[:num,0]
+    self.link_num[:num,0] = [len(c) for c in candidate_sets]
     self.link_map = concatenate(candidate_sets).astype(npint)
     self.link_first[1:num,0] = cumsum(self.link_num[:num-1])
 
@@ -309,7 +305,8 @@ class DifferentialLattice(object):
       t.t('cuda')
 
     self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
-    # print(self.potential[:num,0], self.num_edges[:num,0])
+    print('mean_edges', mean(self.num_edges[:num,0]))
+    print('mean_candidates', mean(self.link_num[:num,0]))
     # print()
 
 

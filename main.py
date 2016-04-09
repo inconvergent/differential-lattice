@@ -26,7 +26,6 @@ def get_wrap(dl, colors, t):
   twopi = pi*2
 
   xy = dl.xy
-  cand_count = dl.cand_count
 
   fn = Fn(prefix='./res/', postfix='.png')
 
