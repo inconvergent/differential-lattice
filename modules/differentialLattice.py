@@ -89,7 +89,7 @@ class DifferentialLattice(object):
     self.dxy = zeros((nmax, 2), npfloat)
     self.num_edges = zeros((nmax, 1), npint)
 
-    self.link_num = zeros((nmax, 1), npint)
+    self.cand_num = zeros((nmax, 1), npint)
     self.tmp = zeros((nmax, 1), npint)
     self.link_map = zeros((nmax, 1), npint)
     self.link_first = zeros((nmax, 1), npint)
@@ -98,120 +98,9 @@ class DifferentialLattice(object):
 
   def __cuda_init(self):
 
-    from pycuda.compiler import SourceModule
+    from helpers import load_kernel
 
-    mod = SourceModule('''
-      __global__ void step(
-        int n,
-        float *xy,
-        int *num_edges,
-        int *first,
-        int *num,
-        int *map,
-        int *potential,
-        float stp,
-        float reject_stp,
-        float attract_stp,
-        float spring_stp,
-        float node_rad
-      ){
-        const int i = blockIdx.x*512 + threadIdx.x;
-
-        if (i>=n) {
-          return;
-        }
-
-        float sx = 0;
-        float sy = 0;
-
-        float dx = 0;
-        float dy = 0;
-        float dd = 0;
-
-        int j;
-        int jj;
-        int aa;
-        int count = 0;
-
-        float vu_dst = 0;
-        float tmp;
-
-        const int ii = 2*i;
-
-        for (int k=0;k<num[i];k++){
-
-          j = map[first[i]+k];
-          jj = 2*j;
-
-          dx = xy[ii] - xy[jj];
-          dy = xy[ii+1] - xy[jj+1];
-          dd = sqrt(dx*dx + dy*dy);
-
-          // TODO: there is something seriously wrong here
-          vu_dst = -1.0;
-          for (int l=0;l<num[i];l++){
-            aa = 2*map[first[i]+l];
-            tmp = sqrt(powf(xy[ii] - xy[aa],2.0) + powf(xy[ii+1] - xy[aa+1],2.0));
-            if (tmp>vu_dst){
-              vu_dst = tmp;
-            }
-            tmp = sqrt(powf(xy[jj] - xy[aa],2.0) + powf(xy[jj+1] - xy[aa+1],2.0));
-            if (tmp>vu_dst){
-              vu_dst = tmp;
-            }
-          }
-
-          if (dd>0.0){
-
-            dx /= dd;
-            dy /= dd;
-
-            if ( dd<=vu_dst){
-            //if ( dd<=3){
-              // linked
-
-              count += 1;
-
-              if (dd>node_rad*1.8){
-                // attract
-                sx += -dx*spring_stp;
-                sy += -dy*spring_stp;
-              }
-              else if(dd<node_rad){
-                // reject
-                sx += dx*reject_stp;
-                sy += dy*reject_stp;
-              }
-            }
-            else{
-              // unlinked
-              if (potential[i]>0 && potential[j]>0){
-                // attract
-                sx += -dx*attract_stp;
-                sy += -dy*attract_stp;
-              }
-              else{
-                // reject
-                sx += dx*reject_stp;
-                sy += dy*reject_stp;
-              }
-            }
-            //sx += dx;
-            //sy += dy;
-          }
-
-        }
-
-        __syncthreads();
-
-        xy[ii] = xy[ii] + sx*stp;
-        xy[ii+1] = xy[ii+1] + sy*stp;
-        num_edges[i] = count;
-
-      }
-    ''')
-
-    self.cuda_step = mod.get_function('step')
+    self.cuda_step = load_kernel('modules/cuda/step.cu', 'step')
 
   def spawn(self, n, xy, dst, rad=0.4):
 
@@ -279,9 +168,9 @@ class DifferentialLattice(object):
     if t:
       t.t('for')
 
-    self.link_num[:num,0] = [len(c) for c in candidate_sets]
+    self.cand_num[:num,0] = [len(c) for c in candidate_sets]
     self.link_map = concatenate(candidate_sets).astype(npint)
-    self.link_first[1:num,0] = cumsum(self.link_num[:num-1])
+    self.link_first[1:num,0] = cumsum(self.cand_num[:num-1])
 
     blocks = (num)//self.threads + 1
     self.cuda_step(
@@ -289,7 +178,7 @@ class DifferentialLattice(object):
       drv.InOut(xy[:num,:]),
       drv.Out(self.num_edges[:num,:]),
       drv.In(self.link_first[:num,0]),
-      drv.In(self.link_num[:num,0]),
+      drv.In(self.cand_num[:num,0]),
       drv.In(self.link_map),
       drv.In(self.potential[:num,0]),
       npfloat(self.stp),
@@ -306,7 +195,7 @@ class DifferentialLattice(object):
 
     self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
     print('mean_edges', mean(self.num_edges[:num,0]))
-    print('mean_candidates', mean(self.link_num[:num,0]))
+    print('mean_candidates', mean(self.cand_num[:num,0]))
     # print()
 
 
