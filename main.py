@@ -8,14 +8,12 @@ from modules.timers import named_sub_timers
 
 
 
-def get_step(t):
+def get_step(t=None):
 
   def step(dl):
 
     dl.cand_spawn(ratio=0.08)
-
-    dl.forces()
-    t.t('frc')
+    dl.forces(t)
 
     return True
 
@@ -47,6 +45,7 @@ def get_wrap(dl, colors, t):
     render.set_line_width(dl.one)
     arc = render.ctx.arc
     fill = render.ctx.fill
+    stroke = render.ctx.stroke
 
     render.clear_canvas()
 
@@ -57,11 +56,14 @@ def get_wrap(dl, colors, t):
 
 
       if cand_flag[i]:
-        render.ctx.set_source_rgba(*colors['cyan'])
+        # render.ctx.set_source_rgba(*colors['cyan'])
+        render.ctx.set_source_rgba(*colors['light'])
+        arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
+        stroke()
       else:
         render.ctx.set_source_rgba(*colors['light'])
-      arc(xy[i,0], xy[i,1], dl.one*3, 0, twopi)
-      fill()
+        arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
+        fill()
 
 
     render.write_to_png(fn.name())
@@ -85,7 +87,7 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 2000
+  size = 1200
   one = 1.0/size
 
   # stp = 5e-6
@@ -96,12 +98,11 @@ def main():
 
   max_capacity = 6
 
-  spawn_count_limit = 6
+  spawn_count_limit = 7
 
   node_rad = 6.0*one
-  disconnect_rad = 2.0*node_rad
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 15.0*node_rad
+  outer_influence_rad = 20.0*node_rad
 
   t = named_sub_timers('dl')
 
@@ -116,7 +117,6 @@ def main():
     max_capacity,
     spawn_count_limit,
     node_rad,
-    disconnect_rad,
     inner_influence_rad,
     outer_influence_rad
   )

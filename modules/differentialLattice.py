@@ -55,7 +55,6 @@ class DifferentialLattice(object):
       max_capacity,
       spawn_count_limit,
       node_rad,
-      disconnect_rad,
       inner_influence_rad,
       outer_influence_rad,
       nmax = 100000
@@ -77,7 +76,6 @@ class DifferentialLattice(object):
     self.max_capacity = max_capacity
     self.spawn_count_limit = spawn_count_limit
     self.node_rad = node_rad
-    self.disconnect_rad = disconnect_rad
     self.inner_influence_rad = inner_influence_rad
     self.outer_influence_rad = outer_influence_rad
 
@@ -221,6 +219,9 @@ class DifferentialLattice(object):
   def spawn(self, n, xy, dst, rad=0.4):
 
     num = self.num
+
+    # from dddUtils.random import darts
+    # new_xy = darts(n, 0.5, 0.5, rad, dst)
     theta = random(n)*TWOPI
     new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
     new_num = len(new_xy)
@@ -231,6 +232,7 @@ class DifferentialLattice(object):
     return new_num
 
   def cand_spawn(self, ratio):
+
 
     num = self.num
     mask = self.cand_count[:num,0] < self.spawn_count_limit
@@ -265,7 +267,7 @@ class DifferentialLattice(object):
 
     return us<mas
 
-  def forces(self):
+  def forces(self, t=None):
 
     self.itt += 1
 
@@ -275,13 +277,19 @@ class DifferentialLattice(object):
 
     candidate_sets = kdt(xy[:num,:]).query_ball_point(
       xy[:num,:],
-      self.disconnect_rad
+      self.inner_influence_rad
     )
+
+    if t:
+      t.t('kdt')
 
     for i, cands in enumerate(candidate_sets):
 
       cand_count[i,0] = len(cands)
       cands = [c for c in cands if c != i]
+
+    if t:
+      t.t('for')
 
     self.link_num[:num,0] = self.cand_count[:num,0]
     self.link_map = concatenate(candidate_sets).astype(npint)
@@ -304,6 +312,9 @@ class DifferentialLattice(object):
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
+
+    if t:
+      t.t('cuda')
 
     self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
 

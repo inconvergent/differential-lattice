@@ -1,9 +1,9 @@
-# Differential Test
+# Differential Lattice
 
 
-![img](/img/img.png?raw=true "img")
+![ani](/img/ani.gif?raw=true "ani")
 
-A generative algorithm.
+A generative algorithm. work in progress.
 
 ## Prerequisites
 
@@ -17,9 +17,10 @@ The code also depends on:
 
 *    `numpy`
 *    `python-cairo` (do not install with pip, this generally does not work)
+*    `pycuda`
 
 
-if cuda is not working try `sudo ldconfig`. and check $LD_LIBRARY_PATH
+note to self: if cuda is not working try `sudo ldconfig`. and check $LD_LIBRARY_PATH
 
 -----------
 http://inconvergent.net
