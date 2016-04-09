@@ -53,7 +53,6 @@ class DifferentialLattice(object):
       reject_stp,
       attract_stp,
       max_capacity,
-      spawn_count_limit,
       node_rad,
       inner_influence_rad,
       outer_influence_rad,
@@ -74,7 +73,6 @@ class DifferentialLattice(object):
     self.attract_stp = attract_stp
     self.reject_stp = reject_stp
     self.max_capacity = max_capacity
-    self.spawn_count_limit = spawn_count_limit
     self.node_rad = node_rad
     self.inner_influence_rad = inner_influence_rad
     self.outer_influence_rad = outer_influence_rad
@@ -235,9 +233,8 @@ class DifferentialLattice(object):
 
 
     num = self.num
-    mask = self.cand_count[:num,0] < self.spawn_count_limit
+    inds = self.potential[:num,0].nonzero()[0]
 
-    inds = arange(num)[mask]
     selected = inds[random(len(inds))<ratio]
 
     new_num = len(selected)
@@ -277,16 +274,13 @@ class DifferentialLattice(object):
 
     candidate_sets = kdt(xy[:num,:]).query_ball_point(
       xy[:num,:],
-      self.inner_influence_rad
+      self.outer_influence_rad
     )
 
     if t:
       t.t('kdt')
 
-    for i, cands in enumerate(candidate_sets):
-
-      cand_count[i,0] = len(cands)
-      cands = [c for c in cands if c != i]
+    cand_count[:num,0] = [len(c) for c in candidate_sets]
 
     if t:
       t.t('for')
@@ -317,5 +311,7 @@ class DifferentialLattice(object):
       t.t('cuda')
 
     self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
+    # print(self.potential[:num,0], self.num_edges[:num,0])
+    # print()
 
 

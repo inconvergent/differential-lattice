@@ -12,7 +12,7 @@ def get_step(t=None):
 
   def step(dl):
 
-    dl.cand_spawn(ratio=0.08)
+    dl.cand_spawn(ratio=0.1)
     dl.forces(t)
 
     return True
@@ -49,7 +49,7 @@ def get_wrap(dl, colors, t):
 
     render.clear_canvas()
 
-    cand_flag = cand_count[:num,0] < dl.spawn_count_limit
+    cand_flag = dl.potential[:num,0]
 
     render.ctx.set_source_rgba(*colors['light'])
     for i in xrange(num):
@@ -91,18 +91,16 @@ def main():
   one = 1.0/size
 
   # stp = 5e-6
-  stp = 1e-5
-  spring_stp = 1.0
-  reject_stp = 10.0
+  stp = 1e-4
+  spring_stp = 0.01
+  reject_stp = 1.0
   attract_stp = reject_stp
 
-  max_capacity = 6
-
-  spawn_count_limit = 7
+  max_capacity = 50
 
   node_rad = 6.0*one
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 20.0*node_rad
+  outer_influence_rad = 6.0*node_rad
 
   t = named_sub_timers('dl')
 
@@ -115,7 +113,6 @@ def main():
     reject_stp,
     attract_stp,
     max_capacity,
-    spawn_count_limit,
     node_rad,
     inner_influence_rad,
     outer_influence_rad
