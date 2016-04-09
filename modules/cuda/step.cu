@@ -10,6 +10,8 @@ __global__ void step(
   float reject_stp,
   float attract_stp,
   float spring_stp,
+  float spring_reject_rad,
+  float spring_attract_rad,
   float node_rad
 ){
   const int i = blockIdx.x*512 + threadIdx.x;
@@ -32,7 +34,6 @@ __global__ void step(
 
   bool linked;
 
-  float vu_dst = 0;
   float ja;
   float ia;
 
@@ -47,8 +48,6 @@ __global__ void step(
     dy = xy[ii+1] - xy[jj+1];
     dd = sqrt(dx*dx + dy*dy);
 
-
-    // TODO: there is something seriously wrong here
     linked = true;
     for (int l=0;l<num[i];l++){
       aa = 2*map[first[i]+l];
@@ -66,36 +65,29 @@ __global__ void step(
       dy /= dd;
 
       if (linked){
-      //if ( dd<=3){
-        // linked
-        count += 1;
+      /*if (dd<2*spring_attract_rad && linked){*/
 
-        if (dd>node_rad*2.0){
-          // attract
+        count += 1;
+        if (dd>spring_attract_rad){
           sx += -dx*spring_stp;
           sy += -dy*spring_stp;
         }
-        else if(dd<node_rad*1.8){
-          // reject
+        else if(dd<spring_reject_rad){
           sx += dx*spring_stp;
           sy += dy*spring_stp;
         }
       }
-      else{
-        // unlinked
+      else{ // unlinked
         if (potential[i]>0 && potential[j]>0){
-          // attract
           sx += -dx*attract_stp;
           sy += -dy*attract_stp;
         }
         else{
-          // reject
           sx += dx*reject_stp;
           sy += dy*reject_stp;
         }
       }
     }
-
   }
 
   __syncthreads();

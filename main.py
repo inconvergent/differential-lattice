@@ -12,7 +12,7 @@ def get_step(t=None):
 
   def step(dl):
 
-    dl.cand_spawn(ratio=0.08)
+    dl.cand_spawn(ratio=0.2)
     dl.forces(t)
 
     return True
@@ -35,7 +35,7 @@ def get_wrap(dl, colors, t):
 
     res = step(dl)
 
-    if dl.itt % 10 != 0:
+    if dl.itt % 15 != 0:
       return res
 
     print('itt', dl.itt, 'num', dl.num)
@@ -44,25 +44,24 @@ def get_wrap(dl, colors, t):
     render.set_line_width(dl.one)
     arc = render.ctx.arc
     fill = render.ctx.fill
-    stroke = render.ctx.stroke
+    # stroke = render.ctx.stroke
 
     render.clear_canvas()
 
-    cand_flag = dl.potential[:num,0]
+    # cand_flag = dl.potential[:num,0]
 
     render.ctx.set_source_rgba(*colors['light'])
     for i in xrange(num):
 
-
-      if cand_flag[i]:
-        # render.ctx.set_source_rgba(*colors['cyan'])
-        render.ctx.set_source_rgba(*colors['light'])
-        arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
-        stroke()
-      else:
-        render.ctx.set_source_rgba(*colors['light'])
-        arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
-        fill()
+      # if cand_flag[i]:
+        # # render.ctx.set_source_rgba(*colors['cyan'])
+        # render.ctx.set_source_rgba(*colors['light'])
+        # arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
+        # stroke()
+      # else:
+      render.ctx.set_source_rgba(*colors['light'])
+      arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
+      fill()
 
 
     render.write_to_png(fn.name())
@@ -86,7 +85,7 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 1500
+  size = 500
   one = 1.0/size
 
   # stp = 5e-6
@@ -95,16 +94,15 @@ def main():
   reject_stp = 0.01
   attract_stp = 0.005
 
+  max_capacity = 20
 
-  max_capacity = 15
-
-  node_rad = 2.0*one
+  node_rad = 2*one
+  spring_reject_rad = node_rad*1.5
+  spring_attract_rad = node_rad*2.0
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 7.0*node_rad
+  outer_influence_rad = 9.0*node_rad
 
   t = named_sub_timers('dl')
-
-
 
   DL = DifferentialLattice(
     size,
@@ -114,11 +112,14 @@ def main():
     attract_stp,
     max_capacity,
     node_rad,
+    spring_reject_rad,
+    spring_attract_rad,
     inner_influence_rad,
-    outer_influence_rad
+    outer_influence_rad,
+    nmax=300000
   )
 
-  DL.spawn(20, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.2)
+  DL.spawn(20, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.1)
 
   render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors, t))
   render.start()

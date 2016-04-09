@@ -9,24 +9,12 @@ from numpy import pi
 
 from numpy import concatenate
 from numpy import cumsum
-# from numpy import any
-# from numpy import array
-# from numpy import logical_and
-# from numpy import logical_or
-# from numpy import logical_not
-from numpy import max
-from numpy import mean
-from numpy import sum
-from numpy import arange
 from numpy import zeros
 from numpy import column_stack
 from numpy import sin
 from numpy import cos
-from numpy import ones
-# from numpy import reshape
 
 from numpy.random import random
-from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree as kdt
 
 from numpy import float32
@@ -54,6 +42,8 @@ class DifferentialLattice(object):
       attract_stp,
       max_capacity,
       node_rad,
+      spring_reject_rad,
+      spring_attract_rad,
       inner_influence_rad,
       outer_influence_rad,
       nmax = 100000
@@ -72,6 +62,8 @@ class DifferentialLattice(object):
     self.spring_stp = spring_stp
     self.attract_stp = attract_stp
     self.reject_stp = reject_stp
+    self.spring_attract_rad = spring_attract_rad
+    self.spring_reject_rad = spring_reject_rad
     self.max_capacity = max_capacity
     self.node_rad = node_rad
     self.inner_influence_rad = inner_influence_rad
@@ -106,10 +98,10 @@ class DifferentialLattice(object):
 
     num = self.num
 
-    from dddUtils.random import darts
-    new_xy = darts(n, 0.5, 0.5, rad, dst)
-    # theta = random(n)*TWOPI
-    # new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
+    # from dddUtils.random import darts
+    # new_xy = darts(n, 0.5, 0.5, rad, dst)
+    theta = random(n)*TWOPI
+    new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
     new_num = len(new_xy)
     if new_num>0:
       self.xy[num:num+new_num,:] = new_xy
@@ -134,22 +126,6 @@ class DifferentialLattice(object):
 
     return 0
 
-  def __is_relative_neighbor(self, i, cands):
-
-    if len(cands)<2:
-      return ones(1, 'bool')
-
-    xy = self.xy
-
-    inds = cands + [i]
-    dists = cdist(xy[inds,:], xy[inds,:])
-
-    uv = dists[:-1,:-1]
-    us = dists[:-1,-1]
-    mas = max(uv, axis=0)
-
-    return us<mas
-
   def forces(self, t=None):
 
     self.itt += 1
@@ -165,12 +141,12 @@ class DifferentialLattice(object):
     if t:
       t.t('kdt')
 
-    if t:
-      t.t('for')
-
     self.cand_num[:num,0] = [len(c) for c in candidate_sets]
     self.link_map = concatenate(candidate_sets).astype(npint)
     self.link_first[1:num,0] = cumsum(self.cand_num[:num-1])
+
+    if t:
+      t.t('stage')
 
     blocks = (num)//self.threads + 1
     self.cuda_step(
@@ -185,6 +161,8 @@ class DifferentialLattice(object):
       npfloat(self.reject_stp),
       npfloat(self.attract_stp),
       npfloat(self.spring_stp),
+      npfloat(self.spring_reject_rad),
+      npfloat(self.spring_attract_rad),
       npfloat(self.node_rad),
       block=(self.threads,1,1),
       grid=(blocks,1)
@@ -193,7 +171,6 @@ class DifferentialLattice(object):
     if t:
       t.t('cuda')
 
-    # self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
     self.potential[:num,0] = self.cand_num[:num,0] < self.max_capacity
 
     # print('mean max edges', mean(self.num_edges[:num,0]), max(self.num_edges[:num,0]))
