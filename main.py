@@ -12,7 +12,7 @@ def get_step(t):
 
   def step(dl):
 
-    dl.cand_spawn(ratio=0.05)
+    dl.cand_spawn(ratio=0.08)
 
     dl.forces()
     t.t('frc')
@@ -60,7 +60,7 @@ def get_wrap(dl, colors, t):
         render.ctx.set_source_rgba(*colors['cyan'])
       else:
         render.ctx.set_source_rgba(*colors['light'])
-      arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
+      arc(xy[i,0], xy[i,1], dl.one*3, 0, twopi)
       fill()
 
 
@@ -85,23 +85,23 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 500
+  size = 2000
   one = 1.0/size
 
   # stp = 5e-6
-  stp = 1e-4
+  stp = 1e-5
   spring_stp = 1.0
-  reject_stp = 1.0
+  reject_stp = 10.0
   attract_stp = reject_stp
 
   max_capacity = 6
 
-  spawn_count_limit = 5
+  spawn_count_limit = 6
 
-  node_rad = 3.0*one
+  node_rad = 6.0*one
   disconnect_rad = 2.0*node_rad
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 8.0*node_rad
+  outer_influence_rad = 15.0*node_rad
 
   t = named_sub_timers('dl')
 
@@ -121,7 +121,7 @@ def main():
     outer_influence_rad
   )
 
-  DL.spawn(100, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.1)
+  DL.spawn(40, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.2)
 
   render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors, t))
   render.start()

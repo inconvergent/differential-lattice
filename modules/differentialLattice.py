@@ -140,7 +140,6 @@ class DifferentialLattice(object):
         int aa;
         int count = 0;
 
-        float su_dst = 0;
         float vu_dst = 0;
         float tmp;
 
@@ -155,17 +154,13 @@ class DifferentialLattice(object):
           dy = xy[ii+1] - xy[jj+1];
           dd = sqrt(dx*dx + dy*dy);
 
-          su_dst = -1.0;
-          for (int l=0;l<num[i];l++){
-            aa = 2*map[first[i]+l];
-            tmp = sqrt(powf(xy[ii] - xy[aa],2.0) + powf(xy[ii+1] - xy[aa+1],2.0));
-            if (tmp>su_dst){
-              su_dst = tmp;
-            }
-          }
           vu_dst = -1.0;
           for (int l=0;l<num[i];l++){
             aa = 2*map[first[i]+l];
+            tmp = sqrt(powf(xy[ii] - xy[aa],2.0) + powf(xy[ii+1] - xy[aa+1],2.0));
+            if (tmp>vu_dst){
+              vu_dst = tmp;
+            }
             tmp = sqrt(powf(xy[jj] - xy[aa],2.0) + powf(xy[jj+1] - xy[aa+1],2.0));
             if (tmp>vu_dst){
               vu_dst = tmp;
@@ -177,7 +172,7 @@ class DifferentialLattice(object):
             dx /= dd;
             dy /= dd;
 
-            if (dd<=max(su_dst, vu_dst)){
+            if (dd<=vu_dst){
               // linked
 
               count += 1;
@@ -206,8 +201,8 @@ class DifferentialLattice(object):
                 sy += dy*reject_stp;
               }
             }
-            sx += dx;
-            sy += dy;
+            //sx += dx;
+            //sy += dy;
           }
 
         }
