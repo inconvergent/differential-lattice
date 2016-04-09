@@ -12,7 +12,7 @@ def get_step(t=None):
 
   def step(dl):
 
-    dl.cand_spawn(ratio=0.01)
+    dl.cand_spawn(ratio=0.08)
     dl.forces(t)
 
     return True
@@ -57,11 +57,11 @@ def get_wrap(dl, colors, t):
       if cand_flag[i]:
         # render.ctx.set_source_rgba(*colors['cyan'])
         render.ctx.set_source_rgba(*colors['light'])
-        arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
+        arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
         stroke()
       else:
         render.ctx.set_source_rgba(*colors['light'])
-        arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
+        arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
         fill()
 
 
@@ -86,20 +86,21 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 500
+  size = 1500
   one = 1.0/size
 
   # stp = 5e-6
-  stp = 1e-4
-  spring_stp = 1.0
+  stp = 5e-5
+  spring_stp = 2.0
   reject_stp = 0.01
   attract_stp = 0.005
 
+
   max_capacity = 15
 
-  node_rad = 3.0*one
+  node_rad = 2.0*one
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 5.0*node_rad
+  outer_influence_rad = 7.0*node_rad
 
   t = named_sub_timers('dl')
 
