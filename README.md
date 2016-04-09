@@ -1,9 +1,16 @@
 # Differential Lattice
 
+A generative algorithm. work in progress.
+
 
 ![ani](/img/ani.gif?raw=true "ani")
 
-A generative algorithm. work in progress.
+![ani](/img/ani2.gif?raw=true "ani")
+
+Sometimes bugs are the best results:
+
+![ani](/img/ani3.gif?raw=true "ani")
+
 
 ## Prerequisites
 

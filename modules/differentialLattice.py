@@ -168,7 +168,7 @@ class DifferentialLattice(object):
             dx /= dd;
             dy /= dd;
 
-            if (dd<=vu_dst){
+            if ( dd<=vu_dst){
               // linked
 
               count += 1;
@@ -218,10 +218,10 @@ class DifferentialLattice(object):
 
     num = self.num
 
-    # from dddUtils.random import darts
-    # new_xy = darts(n, 0.5, 0.5, rad, dst)
-    theta = random(n)*TWOPI
-    new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
+    from dddUtils.random import darts
+    new_xy = darts(n, 0.5, 0.5, rad, dst)
+    # theta = random(n)*TWOPI
+    # new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
     new_num = len(new_xy)
     if new_num>0:
       self.xy[num:num+new_num,:] = new_xy
@@ -231,10 +231,8 @@ class DifferentialLattice(object):
 
   def cand_spawn(self, ratio):
 
-
     num = self.num
     inds = self.potential[:num,0].nonzero()[0]
-
     selected = inds[random(len(inds))<ratio]
 
     new_num = len(selected)

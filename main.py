@@ -58,11 +58,11 @@ def get_wrap(dl, colors, t):
       if cand_flag[i]:
         # render.ctx.set_source_rgba(*colors['cyan'])
         render.ctx.set_source_rgba(*colors['light'])
-        arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
+        arc(xy[i,0], xy[i,1], dl.one*1, 0, twopi)
         stroke()
       else:
         render.ctx.set_source_rgba(*colors['light'])
-        arc(xy[i,0], xy[i,1], dl.one*2, 0, twopi)
+        arc(xy[i,0], xy[i,1], dl.one*1, 0, twopi)
         fill()
 
 
@@ -87,7 +87,7 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 1200
+  size = 500
   one = 1.0/size
 
   # stp = 5e-6
@@ -98,7 +98,7 @@ def main():
 
   max_capacity = 50
 
-  node_rad = 6.0*one
+  node_rad = 3.0*one
   inner_influence_rad = 2.0*node_rad
   outer_influence_rad = 6.0*node_rad
 
