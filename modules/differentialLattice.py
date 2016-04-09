@@ -193,9 +193,11 @@ class DifferentialLattice(object):
     if t:
       t.t('cuda')
 
-    self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
-    print('mean_edges', mean(self.num_edges[:num,0]))
-    print('mean_candidates', mean(self.cand_num[:num,0]))
+    # self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
+    self.potential[:num,0] = self.cand_num[:num,0] < self.max_capacity
+
+    print('mean max edges', mean(self.num_edges[:num,0]), max(self.num_edges[:num,0]))
+    print('mean max candidates', mean(self.cand_num[:num,0]), max(self.cand_num[:num,0]))
     # print()
 
 
