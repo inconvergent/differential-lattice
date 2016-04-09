@@ -12,10 +12,7 @@ def get_step(t):
 
   def step(dl):
 
-    dl.structure()
-    t.t('str')
     dl.cand_spawn(ratio=0.05)
-    t.t('spw')
 
     dl.forces()
     t.t('frc')
@@ -53,7 +50,7 @@ def get_wrap(dl, colors, t):
 
     render.clear_canvas()
 
-    cand_flag = cand_count[:num,0] < dl.cand_count_limit
+    cand_flag = cand_count[:num,0] < dl.spawn_count_limit
 
     render.ctx.set_source_rgba(*colors['light'])
     for i in xrange(num):
@@ -99,7 +96,7 @@ def main():
 
   max_capacity = 6
 
-  cand_count_limit = 5
+  spawn_count_limit = 5
 
   node_rad = 3.0*one
   disconnect_rad = 2.0*node_rad
@@ -117,7 +114,7 @@ def main():
     reject_stp,
     attract_stp,
     max_capacity,
-    cand_count_limit,
+    spawn_count_limit,
     node_rad,
     disconnect_rad,
     inner_influence_rad,

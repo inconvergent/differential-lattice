@@ -53,17 +53,17 @@ class DifferentialLattice(object):
       reject_stp,
       attract_stp,
       max_capacity,
-      cand_count_limit,
+      spawn_count_limit,
       node_rad,
       disconnect_rad,
       inner_influence_rad,
       outer_influence_rad,
-      nmax = 1000000
+      nmax = 100000
     ):
 
     self.itt = 0
 
-    self.threads = 256
+    self.threads = 512
 
     self.nmax = nmax
     self.size = size
@@ -75,7 +75,7 @@ class DifferentialLattice(object):
     self.attract_stp = attract_stp
     self.reject_stp = reject_stp
     self.max_capacity = max_capacity
-    self.cand_count_limit = cand_count_limit
+    self.spawn_count_limit = spawn_count_limit
     self.node_rad = node_rad
     self.disconnect_rad = disconnect_rad
     self.inner_influence_rad = inner_influence_rad
@@ -83,6 +83,25 @@ class DifferentialLattice(object):
 
     self.__init()
     self.__cuda_init()
+
+  def __init(self):
+
+    self.num = 0
+    nmax = self.nmax
+
+    self.xy = zeros((nmax, 2), npfloat)
+    self.dxy = zeros((nmax, 2), npfloat)
+    self.num_edges = zeros((nmax, 1), npint)
+
+    self.link_num = zeros((nmax, 1), npint)
+    self.tmp = zeros((nmax, 1), npint)
+    self.link_map = zeros((nmax, 1), npint)
+    self.link_first = zeros((nmax, 1), npint)
+
+    # self.intensity = zeros((nmax, 1), npfloat)
+
+    self.potential = zeros((nmax, 1), npint)
+    self.cand_count = zeros((nmax, 1), npint)
 
   def __cuda_init(self):
 
@@ -92,9 +111,9 @@ class DifferentialLattice(object):
       __global__ void step(
         int n,
         float *xy,
+        int *num_edges,
         int *first,
         int *num,
-        int *link,
         int *map,
         int *potential,
         float stp,
@@ -103,7 +122,7 @@ class DifferentialLattice(object):
         float spring_stp,
         float node_rad
       ){
-        const int i = blockIdx.x*256 + threadIdx.x;
+        const int i = blockIdx.x*512 + threadIdx.x;
 
         if (i>=n) {
           return;
@@ -116,15 +135,19 @@ class DifferentialLattice(object):
         float dy = 0;
         float dd = 0;
 
-        int f;
         int j;
+        int jj;
+        int aa;
+        int count = 0;
+
+        float su_dst = 0;
+        float vu_dst = 0;
+        float tmp;
 
         const int ii = 2*i;
-        int jj;
 
         for (int k=0;k<num[i];k++){
 
-          f = link[first[i]+k];
           j = map[first[i]+k];
           jj = 2*j;
 
@@ -132,13 +155,32 @@ class DifferentialLattice(object):
           dy = xy[ii+1] - xy[jj+1];
           dd = sqrt(dx*dx + dy*dy);
 
+          su_dst = -1.0;
+          for (int l=0;l<num[i];l++){
+            aa = 2*map[first[i]+l];
+            tmp = sqrt(powf(xy[ii] - xy[aa],2.0) + powf(xy[ii+1] - xy[aa+1],2.0));
+            if (tmp>su_dst){
+              su_dst = tmp;
+            }
+          }
+          vu_dst = -1.0;
+          for (int l=0;l<num[i];l++){
+            aa = 2*map[first[i]+l];
+            tmp = sqrt(powf(xy[jj] - xy[aa],2.0) + powf(xy[jj+1] - xy[aa+1],2.0));
+            if (tmp>vu_dst){
+              vu_dst = tmp;
+            }
+          }
+
           if (dd>0.0){
 
             dx /= dd;
             dy /= dd;
 
-            if (f>0){
+            if (dd<=max(su_dst, vu_dst)){
               // linked
+
+              count += 1;
 
               if (dd>node_rad*1.8){
                 // attract
@@ -174,29 +216,12 @@ class DifferentialLattice(object):
 
         xy[ii] = xy[ii] + sx*stp;
         xy[ii+1] = xy[ii+1] + sy*stp;
+        num_edges[i] = count;
 
       }
     ''')
 
     self.cuda_step = mod.get_function('step')
-
-  def __init(self):
-
-    self.num = 0
-    nmax = self.nmax
-
-    self.xy = zeros((nmax, 2), npfloat)
-    self.dxy = zeros((nmax, 2), npfloat)
-    self.num_edges = zeros((nmax, 1), 'int')
-
-    self.link_num = zeros((nmax, 1), npint)
-    self.link_map = zeros((nmax, 1), npint)
-    self.link_first = zeros((nmax, 1), npint)
-
-    self.intensity = zeros((nmax, 1), npfloat)
-
-    self.potential = zeros((nmax, 1), npint)
-    self.cand_count = zeros((nmax, 1), 'int')
 
   def spawn(self, n, xy, dst, rad=0.4):
 
@@ -213,7 +238,7 @@ class DifferentialLattice(object):
   def cand_spawn(self, ratio):
 
     num = self.num
-    mask = self.cand_count[:num,0] < self.cand_count_limit
+    mask = self.cand_count[:num,0] < self.spawn_count_limit
 
     inds = arange(num)[mask]
     selected = inds[random(len(inds))<ratio]
@@ -245,15 +270,16 @@ class DifferentialLattice(object):
 
     return us<mas
 
-  def structure(self):
+  def forces(self):
+
+    self.itt += 1
 
     num = self.num
-    num_edges = self.num_edges
+    xy = self.xy
     cand_count = self.cand_count
-    rels = []
 
-    candidate_sets = kdt(self.xy[:self.num,:]).query_ball_point(
-      self.xy[:num,:],
+    candidate_sets = kdt(xy[:num,:]).query_ball_point(
+      xy[:num,:],
       self.disconnect_rad
     )
 
@@ -261,31 +287,18 @@ class DifferentialLattice(object):
 
       cand_count[i,0] = len(cands)
       cands = [c for c in cands if c != i]
-      rel = self.__is_relative_neighbor(i, cands)
-      rels.append(rel)
-      num_edges[i,0] = sum(rel)
 
     self.link_num[:num,0] = self.cand_count[:num,0]
     self.link_map = concatenate(candidate_sets).astype(npint)
-    self.link_link = concatenate(rels).astype(npint)
     self.link_first[1:num,0] = cumsum(self.link_num[:num-1])
-
-    self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
-
-  def forces(self):
-
-    self.itt += 1
-
-    num = self.num
-    xy = self.xy
 
     blocks = (num)//self.threads + 1
     self.cuda_step(
       npint(num),
       drv.InOut(xy[:num,:]),
+      drv.Out(self.num_edges[:num,:]),
       drv.In(self.link_first[:num,0]),
       drv.In(self.link_num[:num,0]),
-      drv.In(self.link_link),
       drv.In(self.link_map),
       drv.In(self.potential[:num,0]),
       npfloat(self.stp),
@@ -296,4 +309,7 @@ class DifferentialLattice(object):
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
+
+    self.potential[:num,0] = self.num_edges[:num,0] < self.max_capacity
+
 
