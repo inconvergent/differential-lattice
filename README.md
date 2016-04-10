@@ -7,6 +7,8 @@ A generative algorithm. work in progress.
 
 ![ani](/img/ani2.gif?raw=true "ani")
 
+![ani](/img/ani4.gif?raw=true "ani")
+
 Sometimes bugs are the best results:
 
 ![ani](/img/ani3.gif?raw=true "ani")

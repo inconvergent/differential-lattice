@@ -91,8 +91,8 @@ def main():
   # stp = 5e-6
   stp = 5e-5
   spring_stp = 2.0
-  reject_stp = 0.01
-  attract_stp = 0.005
+  reject_stp = 0.1
+  attract_stp = 0.01
 
   max_capacity = 20
 
