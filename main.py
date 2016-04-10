@@ -3,7 +3,6 @@
 
 
 from __future__ import print_function
-from modules.timers import named_sub_timers
 
 
 
@@ -19,11 +18,15 @@ def get_step(t=None):
 
   return step
 
-def get_wrap(dl, colors, t):
+def get_wrap(dl, colors):
 
   from numpy import pi
   from fn import Fn
+  from modules.timers import named_sub_timers
+
   twopi = pi*2
+
+  t = named_sub_timers('dl')
 
   xy = dl.xy
 
@@ -35,7 +38,7 @@ def get_wrap(dl, colors, t):
 
     res = step(dl)
 
-    if dl.itt % 15 != 0:
+    if dl.itt % 50 != 0:
       return res
 
     print('itt', dl.itt, 'num', dl.num)
@@ -60,7 +63,7 @@ def get_wrap(dl, colors, t):
         # stroke()
       # else:
       render.ctx.set_source_rgba(*colors['light'])
-      arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
+      arc(xy[i,0], xy[i,1], dl.node_rad, 0, twopi)
       fill()
 
 
@@ -85,24 +88,22 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 500
+  size = 1200
   one = 1.0/size
 
   # stp = 5e-6
   stp = 5e-5
-  spring_stp = 2.0
+  spring_stp = 2
   reject_stp = 0.1
   attract_stp = 0.01
 
-  max_capacity = 20
+  max_capacity = 30
 
-  node_rad = 2*one
-  spring_reject_rad = node_rad*1.5
+  node_rad = 1*one
+  spring_reject_rad = node_rad*1.9
   spring_attract_rad = node_rad*2.0
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 9.0*node_rad
-
-  t = named_sub_timers('dl')
+  outer_influence_rad = 15.0*node_rad
 
   DL = DifferentialLattice(
     size,
@@ -119,9 +120,9 @@ def main():
     nmax=300000
   )
 
-  DL.spawn(20, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.1)
+  DL.spawn(20, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.01)
 
-  render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors, t))
+  render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors))
   render.start()
 
 
