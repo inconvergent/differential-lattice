@@ -177,4 +177,3 @@ class DifferentialLattice(object):
     # print('mean max candidates', mean(self.cand_num[:num,0]), max(self.cand_num[:num,0]))
     # print()
 
-
