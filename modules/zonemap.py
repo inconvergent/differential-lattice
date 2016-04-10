@@ -2,15 +2,17 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
+
 from operator import itemgetter
-
-
 from numpy import array
 from numpy import concatenate
 from numpy import logical_not
 from numpy import zeros
 from numpy import reshape
 from numpy import int
+
+
+__ALL__ = ['Zonemap']
 
 
 class Zonemap(object):
@@ -33,7 +35,7 @@ class Zonemap(object):
     num_zones = self.num_zones
     i = 1+int(x[0]*num_zones)
     j = 1+int(x[1]*num_zones)
-    ij = array([i-1,i,i+1,i-1,i,i+1,i-1,i,i+1])*(num_zones+2)+\
+    ij = array([i-1,i,i+1,i-1,i,i+1,i-1,i,i+1])*num_zones+\
          array([j+1,j+1,j+1,j,j,j,j-1,j-1,j-1])
     return ij
 
@@ -48,7 +50,7 @@ class Zonemap(object):
     num_zones = self.num_zones
     i = 1+(x[:,0]*num_zones).astype('int')
     j = 1+(x[:,1]*num_zones).astype('int')
-    z = i*(2+num_zones)+j
+    z = i*num_zones+j
     return z
 
   def __remove(self, i):

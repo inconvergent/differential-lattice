@@ -2,6 +2,7 @@ __global__ void step(
   int n,
   float *xy,
   int *num_edges,
+  int *num_cands,
   int *first,
   int *num,
   int *map,
@@ -12,6 +13,7 @@ __global__ void step(
   float spring_stp,
   float spring_reject_rad,
   float spring_attract_rad,
+  float max_rad,
   float node_rad
 ){
   const int i = blockIdx.x*512 + threadIdx.x;
@@ -30,7 +32,8 @@ __global__ void step(
   int j;
   int jj;
   int aa;
-  int count = 0;
+  int edge_count = 0;
+  int cand_count = 0;
 
   bool linked;
 
@@ -48,6 +51,14 @@ __global__ void step(
     dy = xy[ii+1] - xy[jj+1];
     dd = sqrt(dx*dx + dy*dy);
 
+    if (dd>max_rad){
+      continue;
+    }
+
+    if (dd<=0.0){
+      continue;
+    }
+
     linked = true;
     for (int l=0;l<num[i];l++){
       aa = 2*map[first[i]+l];
@@ -59,33 +70,32 @@ __global__ void step(
       }
     }
 
-    if (dd>0.0){
+    dx /= dd;
+    dy /= dd;
 
-      dx /= dd;
-      dy /= dd;
+    cand_count += 1;
 
-      if (linked){
-      /*if (dd<2*spring_attract_rad && linked){*/
+    if (linked){
+    /*if (dd<2*spring_attract_rad && linked){*/
 
-        count += 1;
-        if (dd>spring_attract_rad){
-          sx += -dx*spring_stp;
-          sy += -dy*spring_stp;
-        }
-        else if(dd<spring_reject_rad){
-          sx += dx*spring_stp;
-          sy += dy*spring_stp;
-        }
+      edge_count += 1;
+      if (dd>spring_attract_rad){
+        sx += -dx*spring_stp;
+        sy += -dy*spring_stp;
       }
-      else{ // unlinked
-        if (potential[i]>0 && potential[j]>0){
-          sx += -dx*attract_stp;
-          sy += -dy*attract_stp;
-        }
-        else{
-          sx += dx*reject_stp;
-          sy += dy*reject_stp;
-        }
+      else if(dd<spring_reject_rad){
+        sx += dx*spring_stp;
+        sy += dy*spring_stp;
+      }
+    }
+    else{ // unlinked
+      if (potential[i]>0 && potential[j]>0){
+        sx += -dx*attract_stp;
+        sy += -dy*attract_stp;
+      }
+      else{
+        sx += dx*reject_stp;
+        sy += dy*reject_stp;
       }
     }
   }
@@ -94,6 +104,7 @@ __global__ void step(
 
   xy[ii] = xy[ii] + sx*stp;
   xy[ii+1] = xy[ii+1] + sy*stp;
-  num_edges[i] = count;
+  num_edges[i] = edge_count;
+  num_cands[i] = cand_count;
 
 }
