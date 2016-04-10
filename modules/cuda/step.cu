@@ -2,7 +2,6 @@ __global__ void step(
   int n,
   float *xy,
   int *num_edges,
-  int *num_cands,
   int *first,
   int *num,
   int *map,
@@ -51,9 +50,9 @@ __global__ void step(
     dy = xy[ii+1] - xy[jj+1];
     dd = sqrt(dx*dx + dy*dy);
 
-    if (dd>max_rad){
-      continue;
-    }
+    /*if (dd>max_rad){*/
+      /*continue;*/
+    /*}*/
 
     if (dd<=0.0){
       continue;
@@ -105,6 +104,5 @@ __global__ void step(
   xy[ii] = xy[ii] + sx*stp;
   xy[ii+1] = xy[ii+1] + sy*stp;
   num_edges[i] = edge_count;
-  num_cands[i] = cand_count;
 
 }

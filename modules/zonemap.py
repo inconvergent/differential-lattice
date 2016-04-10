@@ -10,6 +10,7 @@ from numpy import logical_not
 from numpy import zeros
 from numpy import reshape
 from numpy import int
+from numpy.linalg import norm
 
 
 __ALL__ = ['Zonemap']
@@ -52,6 +53,12 @@ class Zonemap(object):
     j = 1+(x[:,1]*num_zones).astype('int')
     z = i*num_zones+j
     return z
+
+  def sphere_vertices(self, x, rad):
+
+    inds = self.near_zone_inds(x)
+    dd = norm(x - self.xy[inds,:], axis=1)
+    return inds[dd<rad]
 
   def __remove(self, i):
 

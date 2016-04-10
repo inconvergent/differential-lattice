@@ -83,7 +83,7 @@ class DifferentialLattice(object):
     self.dxy = zeros((nmax, 2), npfloat)
     self.num_edges = zeros((nmax, 1), npint)
 
-    self.num_cands = zeros((nmax, 1), npint)
+    # self.num_cands = zeros((nmax, 1), npint)
     self.tmp = zeros((nmax, 1), npint)
 
     self.link_map = zeros((nmax, 1), npint)
@@ -146,14 +146,9 @@ class DifferentialLattice(object):
     num = self.num
     xy = self.xy
 
-    # cs = kdt(xy[:num,:]).query_ball_point(
-      # xy[:num,:],
-      # self.outer_influence_rad
-    # )
-
     cs = []
     for x in self.xy[:num,:]:
-      cs.append(self.zonemap.near_zone_inds(x))
+      cs.append(self.zonemap.sphere_vertices(x, self.outer_influence_rad))
     self.link_map = concatenate(cs).astype(npint)
 
     if t:
@@ -171,7 +166,6 @@ class DifferentialLattice(object):
       npint(num),
       drv.InOut(xy[:num,:]),
       drv.Out(self.num_edges[:num,:]),
-      drv.Out(self.num_cands[:num,:]),
       drv.In(self.link_first[:num,0]),
       drv.In(self.link_num[:num,0]),
       drv.In(self.link_map),
@@ -188,7 +182,7 @@ class DifferentialLattice(object):
       grid=(blocks,1)
     )
 
-    self.potential[:num,0] = self.num_cands[:num,0] < self.max_capacity
+    self.potential[:num,0] = self.link_num[:num,0] < self.max_capacity
     if t:
       t.t('cuda')
 
