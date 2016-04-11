@@ -7,15 +7,12 @@ import pycuda.driver as drv
 
 from numpy import pi
 
-from numpy import concatenate
-from numpy import cumsum
 from numpy import zeros
 from numpy import column_stack
 from numpy import sin
 from numpy import cos
 
 from numpy.random import random
-from scipy.spatial import cKDTree as kdt
 
 from numpy import float32
 from numpy import int32
@@ -58,6 +55,8 @@ class DifferentialLattice(object):
 
     self.one = 1.0/size
 
+    self.zone_leap = 1000
+
     self.stp = stp
     self.spring_stp = spring_stp
     self.attract_stp = attract_stp
@@ -75,18 +74,16 @@ class DifferentialLattice(object):
   def __init(self):
 
     self.num = 0
+
+    nz = int(1.0/self.outer_influence_rad)
+    self.nz = nz
+    self.nz2 = nz**2
     nmax = self.nmax
 
     self.xy = zeros((nmax, 2), npfloat)
-    self.dxy = zeros((nmax, 2), npfloat)
-    self.num_edges = zeros((nmax, 1), npint)
-
-    self.cand_num = zeros((nmax, 1), npint)
-    self.tmp = zeros((nmax, 1), npint)
-    self.link_map = zeros((nmax, 1), npint)
-    self.link_first = zeros((nmax, 1), npint)
-
     self.potential = zeros((nmax, 1), npint)
+    self.zone_num = zeros((self.nz2, 1), npint)
+    self.zone_node = zeros((self.nz2*self.zone_leap, 1), npint)
 
   def __cuda_init(self):
 
@@ -133,30 +130,15 @@ class DifferentialLattice(object):
     num = self.num
     xy = self.xy
 
-    candidate_sets = kdt(xy[:num,:]).query_ball_point(
-      xy[:num,:],
-      self.outer_influence_rad
-    )
-
-    if t:
-      t.t('kdt')
-
-    self.cand_num[:num,0] = [len(c) for c in candidate_sets]
-    self.link_map = concatenate(candidate_sets).astype(npint)
-    self.link_first[1:num,0] = cumsum(self.cand_num[:num-1])
-
-    if t:
-      t.t('stage')
-
     blocks = (num)//self.threads + 1
     self.cuda_step(
       npint(num),
+      npint(self.nz),
+      npint(self.zone_leap),
       drv.InOut(xy[:num,:]),
-      drv.Out(self.num_edges[:num,:]),
-      drv.In(self.link_first[:num,0]),
-      drv.In(self.cand_num[:num,0]),
-      drv.In(self.link_map),
-      drv.In(self.potential[:num,0]),
+      drv.Out(self.potential[:num,:]),
+      drv.In(self.zone_num),
+      drv.In(self.zone_node),
       npfloat(self.stp),
       npfloat(self.reject_stp),
       npfloat(self.attract_stp),
@@ -164,6 +146,8 @@ class DifferentialLattice(object):
       npfloat(self.spring_reject_rad),
       npfloat(self.spring_attract_rad),
       npfloat(self.node_rad),
+      npint(self.max_capacity),
+      npfloat(self.outer_influence_rad),
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
@@ -171,10 +155,5 @@ class DifferentialLattice(object):
     if t:
       t.t('cuda')
 
-    self.potential[:num,0] = self.cand_num[:num,0] < self.max_capacity
-
-    # print('mean max edges', mean(self.num_edges[:num,0]), max(self.num_edges[:num,0]))
-    # print('mean max candidates', mean(self.cand_num[:num,0]), max(self.cand_num[:num,0]))
-    # print()
-
+    print(max(self.potential[:num]))
 
