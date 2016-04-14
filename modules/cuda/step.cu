@@ -3,22 +3,20 @@ __global__ void step(
   int nz,
   int zone_leap,
   float *xy,
-  int *potential,
+  int *tmp,
   int *zone_num,
   int *zone_node,
   float stp,
   float reject_stp,
-  float attract_stp,
   float spring_stp,
   float spring_reject_rad,
   float spring_attract_rad,
   int max_capacity,
-  float node_rad,
   float max_rad
 ){
-  const int i = blockIdx.x*512 + threadIdx.x;
+  const int i = blockIdx.x*256 + threadIdx.x;
 
-  if (i>=n) {
+  if (i>=n){
     return;
   }
 
@@ -39,25 +37,29 @@ __global__ void step(
 
   int edge_count = 0;
   int cand_count = 0;
+  int total_count = 0;
 
   bool linked;
 
-  int old = atomicAdd(&zone_num[z], 1);
-  zone_node[z*zone_leap+old] = i;
+  __syncthreads();
+  zone_node[z*zone_leap+atomicAdd(&zone_num[z], 1)] = i;
+  __syncthreads();
 
   int proximity[1000];
-
-  __syncthreads();
 
   for (int a=max(zi-1,0);a<min(zi+2,nz);a++){
     for (int b=max(zj-1,0);b<min(zj+2,nz);b++){
       zk = a*nz+b;
       for (int k=0;k<zone_num[zk];k++){
         jj = 2*zone_node[zk*zone_leap+k];
+        if (jj==ii){
+          continue;
+        }
+        total_count += 1;
         dx = xy[ii] - xy[jj];
         dy = xy[ii+1] - xy[jj+1];
         dd = sqrt(dx*dx + dy*dy);
-        if (dd<max_rad){
+        if (dd<max_rad && dd>0.0f){
           proximity[cand_count] = jj/2;
           cand_count += 1;
         }
@@ -76,9 +78,12 @@ __global__ void step(
     linked = true;
     for (int l=0;l<cand_count;l++){
       aa = 2*proximity[l];
+      if (aa==ii || jj==aa){
+        continue;
+      }
       if (dd>max(
-          sqrt(powf(xy[ii] - xy[aa],2.0) + powf(xy[ii+1] - xy[aa+1],2.0)),
-          sqrt(powf(xy[jj] - xy[aa],2.0) + powf(xy[jj+1] - xy[aa+1],2.0))
+          sqrt(powf(xy[ii] - xy[aa],2.0f) + powf(xy[ii+1] - xy[aa+1],2.0f)),
+          sqrt(powf(xy[jj] - xy[aa],2.0f) + powf(xy[jj+1] - xy[aa+1],2.0f))
         )
       ){
         linked = false;
@@ -86,7 +91,7 @@ __global__ void step(
       }
     }
 
-    if (dd>0.0){
+    if (dd>0.0f){
 
       dx /= dd;
       dy /= dd;
@@ -103,14 +108,8 @@ __global__ void step(
         }
       }
       else{ // unlinked
-        if (potential[i]>0 && potential[jj/2]>0){
-          sx += -dx*attract_stp;
-          sy += -dy*attract_stp;
-        }
-        else{
-          sx += dx*reject_stp;
-          sy += dy*reject_stp;
-        }
+        sx += dx*reject_stp;
+        sy += dy*reject_stp;
       }
     }
   }
@@ -119,12 +118,6 @@ __global__ void step(
 
   xy[ii] = xy[ii] + sx*stp;
   xy[ii+1] = xy[ii+1] + sy*stp;
-  /*potential[i] = cand_count;*/
-  if (cand_count<max_capacity){
-    potential[i] = cand_count;
-  }
-  else{
-    potential[i] = 0;
-  }
+  tmp[i] = cand_count;
 
 }
