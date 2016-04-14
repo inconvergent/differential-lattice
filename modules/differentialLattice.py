@@ -69,6 +69,9 @@ class DifferentialLattice(object):
     self.inner_influence_rad = inner_influence_rad
     self.outer_influence_rad = outer_influence_rad
 
+    self.alpha = 0.05
+    self.diminish = 0.985
+
     self.__init()
     self.__cuda_init()
 
@@ -88,6 +91,11 @@ class DifferentialLattice(object):
 
     self.potential = zeros((nmax, 1), npint)
 
+    self.intensity = zeros((nmax, 1), npfloat)
+
+    from dddUtils.random import darts
+    self.sources = darts(30000, 0.5, 0.5, 0.4, self.node_rad)
+
   def __cuda_init(self):
 
     from helpers import load_kernel
@@ -105,6 +113,8 @@ class DifferentialLattice(object):
     new_num = len(new_xy)
     if new_num>0:
       self.xy[num:num+new_num,:] = new_xy
+      self.intensity[num:num+new_num,:] = 1.0
+
 
     self.num += new_num
     return new_num
@@ -121,6 +131,25 @@ class DifferentialLattice(object):
       theta = random(new_num)*TWOPI
       offset = column_stack([cos(theta), sin(theta)])*self.node_rad*0.5
       self.xy[num:num+new_num,:] = new_xy+offset
+      self.intensity[num:num+new_num,:] = self.intensity[selected,:]
+      self.num += new_num
+      return new_num
+
+    return 0
+
+  def intensity_spawn(self, ratio):
+
+    num = self.num
+    inds = (self.intensity[:num,0]>ratio).nonzero()[0]
+    selected = inds
+
+    new_num = len(selected)
+    if new_num>0:
+      new_xy = self.xy[selected,:]
+      theta = random(new_num)*TWOPI
+      offset = column_stack([cos(theta), sin(theta)])*self.node_rad*0.5
+      self.xy[num:num+new_num,:] = new_xy+offset
+      self.intensity[num:num+new_num,:] = self.intensity[selected,:]*0.7
       self.num += new_num
       return new_num
 
@@ -128,15 +157,33 @@ class DifferentialLattice(object):
 
   def forces(self, t=None):
 
+    from numpy import array
+    from numpy import logical_not
+
     self.itt += 1
 
     num = self.num
     xy = self.xy
 
-    candidate_sets = kdt(xy[:num,:]).query_ball_point(
+    sources = self.sources
+
+    tree = kdt(xy[:num,:])
+
+    candidate_sets = tree.query_ball_point(
       xy[:num,:],
       self.outer_influence_rad
     )
+
+    hits = tree.query_ball_point(
+      sources,
+      self.node_rad*4
+    )
+    hit_nodes = concatenate(hits).astype(int)
+    if len(hit_nodes)>0:
+      hit_sources = array([len(s)>0 for s in hits], 'bool')
+      unhit_sources = logical_not(hit_sources)
+      self.sources = sources[unhit_sources,:]
+      self.intensity[hit_nodes] = 1
 
     if t:
       t.t('kdt')
@@ -157,6 +204,7 @@ class DifferentialLattice(object):
       drv.In(self.cand_num[:num,0]),
       drv.In(self.link_map),
       drv.In(self.potential[:num,0]),
+      drv.InOut(self.intensity[:num,0]),
       npfloat(self.stp),
       npfloat(self.reject_stp),
       npfloat(self.attract_stp),
@@ -164,6 +212,8 @@ class DifferentialLattice(object):
       npfloat(self.spring_reject_rad),
       npfloat(self.spring_attract_rad),
       npfloat(self.node_rad),
+      npfloat(self.alpha),
+      npfloat(self.diminish),
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
@@ -171,10 +221,6 @@ class DifferentialLattice(object):
     if t:
       t.t('cuda')
 
-    self.potential[:num,0] = self.cand_num[:num,0] < self.max_capacity
-
-    # print('mean max edges', mean(self.num_edges[:num,0]), max(self.num_edges[:num,0]))
-    # print('mean max candidates', mean(self.cand_num[:num,0]), max(self.cand_num[:num,0]))
-    # print()
-
+    # self.potential[:num,0] = self.cand_num[:num,0] < self.max_capacity
+    self.potential[:num,0] = self.intensity[:num,0] > 0.9
 

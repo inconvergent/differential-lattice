@@ -6,13 +6,16 @@ __global__ void step(
   int *num,
   int *map,
   int *potential,
+  float *intensity,
   float stp,
   float reject_stp,
   float attract_stp,
   float spring_stp,
   float spring_reject_rad,
   float spring_attract_rad,
-  float node_rad
+  float node_rad,
+  float alpha,
+  float diminish
 ){
   const int i = blockIdx.x*512 + threadIdx.x;
 
@@ -20,12 +23,12 @@ __global__ void step(
     return;
   }
 
-  float sx = 0;
-  float sy = 0;
+  float sx = 0.0f;
+  float sy = 0.0f;
 
-  float dx = 0;
-  float dy = 0;
-  float dd = 0;
+  float dx = 0.0f;
+  float dy = 0.0f;
+  float dd = 0.0f;
 
   int j;
   int jj;
@@ -36,6 +39,8 @@ __global__ void step(
 
   float ja;
   float ia;
+
+  float new_intensity = intensity[i];
 
   const int ii = 2*i;
 
@@ -51,15 +56,15 @@ __global__ void step(
     linked = true;
     for (int l=0;l<num[i];l++){
       aa = 2*map[first[i]+l];
-      ia = sqrt(powf(xy[ii] - xy[aa],2.0) + powf(xy[ii+1] - xy[aa+1],2.0));
-      ja = sqrt(powf(xy[jj] - xy[aa],2.0) + powf(xy[jj+1] - xy[aa+1],2.0));
+      ia = sqrt(powf(xy[ii] - xy[aa],2.0f) + powf(xy[ii+1] - xy[aa+1],2.0f));
+      ja = sqrt(powf(xy[jj] - xy[aa],2.0f) + powf(xy[jj+1] - xy[aa+1],2.0f));
       if (dd>max(ia,ja)){
         linked = false;
         break;
       }
     }
 
-    if (dd>0.0){
+    if (dd>0.0f){
 
       dx /= dd;
       dy /= dd;
@@ -68,6 +73,9 @@ __global__ void step(
       /*if (dd<2*spring_attract_rad && linked){*/
 
         count += 1;
+
+        new_intensity += alpha*intensity[j];
+
         if (dd>spring_attract_rad){
           sx += -dx*spring_stp;
           sy += -dy*spring_stp;
@@ -92,8 +100,9 @@ __global__ void step(
 
   __syncthreads();
 
-  xy[ii] = xy[ii] + sx*stp;
-  xy[ii+1] = xy[ii+1] + sy*stp;
+  xy[ii] = xy[ii] + sx*stp*sqrt(intensity[i]);
+  xy[ii+1] = xy[ii+1] + sy*stp*sqrt(intensity[i]);
   num_edges[i] = count;
+  intensity[i] = diminish*new_intensity / (1.0 + alpha *(float)(count));
 
 }

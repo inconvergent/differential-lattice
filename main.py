@@ -11,7 +11,9 @@ def get_step(t=None):
 
   def step(dl):
 
-    dl.cand_spawn(ratio=0.2)
+    if dl.itt%2==0:
+      dl.intensity_spawn(ratio=0.7)
+
     dl.forces(t)
 
     return True
@@ -29,6 +31,7 @@ def get_wrap(dl, colors):
   t = named_sub_timers('dl')
 
   xy = dl.xy
+  intensity = dl.intensity
 
   fn = Fn(prefix='./res/', postfix='.png')
 
@@ -38,7 +41,7 @@ def get_wrap(dl, colors):
 
     res = step(dl)
 
-    if dl.itt % 50 != 0:
+    if dl.itt % 10 != 0:
       return res
 
     print('itt', dl.itt, 'num', dl.num)
@@ -62,7 +65,11 @@ def get_wrap(dl, colors):
         # arc(xy[i,0], xy[i,1], dl.node_rad*0.7, 0, twopi)
         # stroke()
       # else:
-      render.ctx.set_source_rgba(*colors['light'])
+      # render.ctx.set_source_rgba(*colors['light'])
+
+      w = intensity[i]
+      rgb = [0, w, w, 0.7]
+      render.ctx.set_source_rgba(*rgb)
       arc(xy[i,0], xy[i,1], dl.node_rad, 0, twopi)
       fill()
 
@@ -88,11 +95,10 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 1200
+  size = 1500
   one = 1.0/size
 
-  # stp = 5e-6
-  stp = 5e-5
+  stp = 1e-4
   spring_stp = 2
   reject_stp = 0.1
   attract_stp = 0.01
@@ -103,7 +109,7 @@ def main():
   spring_reject_rad = node_rad*1.9
   spring_attract_rad = node_rad*2.0
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 15.0*node_rad
+  outer_influence_rad = 9.0*node_rad
 
   DL = DifferentialLattice(
     size,
@@ -123,6 +129,7 @@ def main():
   DL.spawn(20, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.01)
 
   render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors))
+  render.ctx.set_source_rgba(*colors['light'])
   render.start()
 
 
