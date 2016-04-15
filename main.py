@@ -92,7 +92,7 @@ def main():
 
   # stp = 5e-6
   stp = 1e-5
-  spring_stp = 2
+  spring_stp = 1
   reject_stp = 0.1
 
   max_capacity = 15

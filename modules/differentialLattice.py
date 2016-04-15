@@ -48,7 +48,7 @@ class DifferentialLattice(object):
 
     self.itt = 0
 
-    self.threads = 256
+    self.threads = 128
 
     self.nmax = nmax
     self.size = size
@@ -80,16 +80,18 @@ class DifferentialLattice(object):
     nmax = self.nmax
 
     self.xy = zeros((nmax, 2), npfloat)
+    self.dxy = zeros((nmax, 2), npfloat)
     self.potential = zeros((nmax, 1), 'bool')
     self.tmp = zeros((nmax, 1), npint)
-    self.zone_num = zeros((self.nz2, 1), npint)
-    self.zone_node = zeros((self.nz2*self.zone_leap, 1), npint)
+    self.zone_num = zeros(self.nz2, npint)
+    self.zone_node = zeros(self.nz2*self.zone_leap, npint)
 
   def __cuda_init(self):
 
     from helpers import load_kernel
 
     self.cuda_step = load_kernel('modules/cuda/step.cu', 'step')
+    self.cuda_agg = load_kernel('modules/cuda/agg.cu', 'agg')
 
   def spawn(self, n, xy, dst, rad=0.4):
 
@@ -129,17 +131,38 @@ class DifferentialLattice(object):
 
     num = self.num
     xy = self.xy
-
-    self.zone_num[:,:] = 0
-    self.zone_node[:,:] = 0
-    self.tmp[:num,0] = 0
-
+    dxy = self.dxy
     blocks = (num)//self.threads + 1
+
+    self.zone_num[:] = 0
+    # self.zone_node[:] = 0
+    # self.tmp[:num,:] = 0
+
+
+    if t:
+      t.t('ini')
+
+    self.cuda_agg(
+      npint(num),
+      npint(self.nz),
+      npint(self.zone_leap),
+      drv.In(xy[:num,:]),
+      drv.InOut(self.zone_num),
+      drv.InOut(self.zone_node),
+      drv.Out(self.tmp[:num,0]),
+      block=(self.threads,1,1),
+      grid=(blocks,1)
+    )
+
+    if t:
+      t.t('kern1')
+
     self.cuda_step(
       npint(num),
       npint(self.nz),
       npint(self.zone_leap),
-      drv.InOut(xy[:num,:]),
+      drv.In(xy[:num,:]),
+      drv.Out(dxy[:num,:]),
       drv.Out(self.tmp[:num,:]),
       drv.In(self.zone_num),
       drv.In(self.zone_node),
@@ -154,17 +177,15 @@ class DifferentialLattice(object):
       grid=(blocks,1)
     )
 
-    self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
-
-    # print('threads',blocks*self.threads, num, blocks*self.threads>num)
-    if not blocks*self.threads>num:
-      raise ValueError()
-
     if t:
-      t.t('cuda')
+      t.t('kern2')
 
-    # if self.itt%10==0:
-    # print(max(self.tmp[:num,0]), mean(self.tmp[:num,0]), min(self.tmp[:num,0]))
-    print((self.tmp[:num,0]<self.max_capacity).nonzero()[0] )
-    print(self.tmp[(self.tmp[:num,0]<self.max_capacity).nonzero()[0], :].squeeze())
-    print()
+    # print(dxy[:num,:])
+    xy[:num,:] += dxy[:num,:]
+    self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
+    if t:
+      t.t('inc')
+
+    # if not blocks*self.threads>num:
+      # raise ValueError()
+

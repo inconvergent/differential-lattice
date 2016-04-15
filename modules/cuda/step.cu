@@ -3,6 +3,7 @@ __global__ void step(
   int nz,
   int zone_leap,
   float *xy,
+  float *dxy,
   int *tmp,
   int *zone_num,
   int *zone_node,
@@ -14,7 +15,7 @@ __global__ void step(
   int max_capacity,
   float max_rad
 ){
-  const int i = blockIdx.x*256 + threadIdx.x;
+  const int i = blockIdx.x*128 + threadIdx.x;
 
   if (i>=n){
     return;
@@ -23,7 +24,6 @@ __global__ void step(
   const int ii = 2*i;
   const int zi = (int) floor(xy[ii]*nz);
   const int zj = (int) floor(xy[ii+1]*nz);
-  const int z = zi*nz + zj;
 
   float sx = 0;
   float sy = 0;
@@ -41,10 +41,6 @@ __global__ void step(
 
   bool linked;
 
-  __syncthreads();
-  zone_node[z*zone_leap+atomicAdd(&zone_num[z], 1)] = i;
-  __syncthreads();
-
   int proximity[1000];
 
   for (int a=max(zi-1,0);a<min(zi+2,nz);a++){
@@ -52,9 +48,6 @@ __global__ void step(
       zk = a*nz+b;
       for (int k=0;k<zone_num[zk];k++){
         jj = 2*zone_node[zk*zone_leap+k];
-        if (jj==ii){
-          continue;
-        }
         total_count += 1;
         dx = xy[ii] - xy[jj];
         dy = xy[ii+1] - xy[jj+1];
@@ -78,9 +71,6 @@ __global__ void step(
     linked = true;
     for (int l=0;l<cand_count;l++){
       aa = 2*proximity[l];
-      if (aa==ii || jj==aa){
-        continue;
-      }
       if (dd>max(
           sqrt(powf(xy[ii] - xy[aa],2.0f) + powf(xy[ii+1] - xy[aa+1],2.0f)),
           sqrt(powf(xy[jj] - xy[aa],2.0f) + powf(xy[jj+1] - xy[aa+1],2.0f))
@@ -114,10 +104,8 @@ __global__ void step(
     }
   }
 
-  __syncthreads();
-
-  xy[ii] = xy[ii] + sx*stp;
-  xy[ii+1] = xy[ii+1] + sy*stp;
+  dxy[ii] = sx*stp;
+  dxy[ii+1] = sy*stp;
   tmp[i] = cand_count;
 
 }
