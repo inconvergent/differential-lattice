@@ -48,7 +48,7 @@ class DifferentialLattice(object):
 
     self.itt = 0
 
-    self.threads = 128
+    self.threads = 512
 
     self.nmax = nmax
     self.size = size
@@ -180,11 +180,14 @@ class DifferentialLattice(object):
     if t:
       t.t('kern2')
 
-    # print(dxy[:num,:])
+
     xy[:num,:] += dxy[:num,:]
     self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
     if t:
       t.t('inc')
+
+    if not self.itt%10:
+      print('max cands', max(self.tmp[:num,0]))
 
     # if not blocks*self.threads>num:
       # raise ValueError()

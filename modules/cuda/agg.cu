@@ -7,7 +7,7 @@ __global__ void agg(
   int *zone_node,
   int *tmp
 ){
-  const int i = blockIdx.x*128 + threadIdx.x;
+  const int i = blockIdx.x*512 + threadIdx.x;
 
   if (i>=n){
     return;

@@ -15,7 +15,7 @@ __global__ void step(
   int max_capacity,
   float max_rad
 ){
-  const int i = blockIdx.x*128 + threadIdx.x;
+  const int i = blockIdx.x*512 + threadIdx.x;
 
   if (i>=n){
     return;
@@ -41,7 +41,7 @@ __global__ void step(
 
   bool linked;
 
-  int proximity[1000];
+  int proximity[200];
 
   for (int a=max(zi-1,0);a<min(zi+2,nz);a++){
     for (int b=max(zj-1,0);b<min(zj+2,nz);b++){
