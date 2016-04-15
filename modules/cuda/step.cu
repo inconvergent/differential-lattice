@@ -15,7 +15,8 @@ __global__ void step(
   int max_capacity,
   float max_rad
 ){
-  const int i = blockIdx.x*512 + threadIdx.x;
+  // THREADS is replaced by helpers.load_kernel
+  const int i = blockIdx.x*THREADS + threadIdx.x;
 
   if (i>=n){
     return;

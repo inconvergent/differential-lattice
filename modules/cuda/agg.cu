@@ -7,7 +7,8 @@ __global__ void agg(
   int *zone_node,
   int *tmp
 ){
-  const int i = blockIdx.x*512 + threadIdx.x;
+  // THREADS is replaced by helpers.load_kernel
+  const int i = blockIdx.x*THREADS + threadIdx.x;
 
   if (i>=n){
     return;

@@ -43,19 +43,20 @@ class DifferentialLattice(object):
       spring_attract_rad,
       inner_influence_rad,
       outer_influence_rad,
+      threads = 256,
       nmax = 100000
     ):
 
     self.itt = 0
 
-    self.threads = 512
+    self.threads = threads
 
     self.nmax = nmax
     self.size = size
 
     self.one = 1.0/size
 
-    self.zone_leap = 1000
+    self.zone_leap = 200 # hard coded in step.cu
 
     self.stp = stp
     self.spring_stp = spring_stp
@@ -90,8 +91,8 @@ class DifferentialLattice(object):
 
     from helpers import load_kernel
 
-    self.cuda_step = load_kernel('modules/cuda/step.cu', 'step')
-    self.cuda_agg = load_kernel('modules/cuda/agg.cu', 'agg')
+    self.cuda_step = load_kernel('modules/cuda/step.cu', 'step', threads=self.threads)
+    self.cuda_agg = load_kernel('modules/cuda/agg.cu', 'agg', threads=self.threads)
 
   def spawn(self, n, xy, dst, rad=0.4):
 
@@ -135,9 +136,6 @@ class DifferentialLattice(object):
     blocks = (num)//self.threads + 1
 
     self.zone_num[:] = 0
-    # self.zone_node[:] = 0
-    # self.tmp[:num,:] = 0
-
 
     if t:
       t.t('ini')
@@ -180,13 +178,12 @@ class DifferentialLattice(object):
     if t:
       t.t('kern2')
 
-
     xy[:num,:] += dxy[:num,:]
     self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
     if t:
       t.t('inc')
 
-    if not self.itt%10:
+    if not self.itt%20:
       print('max cands', max(self.tmp[:num,0]))
 
     # if not blocks*self.threads>num:

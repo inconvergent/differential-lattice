@@ -86,7 +86,9 @@ def main():
     'light': [0,0,0,0.6],
   }
 
-  size = 1200
+  threads = 512
+
+  size = 2000
   one = 1.0/size
 
   # stp = 5e-6
@@ -113,6 +115,7 @@ def main():
     spring_attract_rad,
     inner_influence_rad,
     outer_influence_rad,
+    threads=threads,
     nmax=300000
   )
 
