@@ -1,3 +1,6 @@
+#define THREADS _THREADS_
+#define PROX _PROX_
+
 __global__ void step(
   int n,
   int nz,
@@ -15,7 +18,6 @@ __global__ void step(
   int max_capacity,
   float max_rad
 ){
-  // THREADS is replaced by helpers.load_kernel
   const int i = blockIdx.x*THREADS + threadIdx.x;
 
   if (i>=n){
@@ -42,7 +44,7 @@ __global__ void step(
 
   bool linked;
 
-  int proximity[200];
+  int proximity[PROX];
 
   for (int a=max(zi-1,0);a<min(zi+2,nz);a++){
     for (int b=max(zj-1,0);b<min(zj+2,nz);b++){
@@ -110,3 +112,4 @@ __global__ void step(
   tmp[i] = cand_count;
 
 }
+

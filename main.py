@@ -6,7 +6,6 @@ from __future__ import print_function
 
 
 
-
 def get_step(t=None):
 
   def step(dl):
@@ -78,6 +77,7 @@ def main():
   from numpy import array
   from modules.differentialLattice import DifferentialLattice
   from render.render import Animate
+  from modules.helpers import spawn_circle
 
   colors = {
     'back': [1,1,1,1],
@@ -87,12 +87,12 @@ def main():
   }
 
   threads = 512
+  zone_leap = 512
 
-  size = 2000
+  size = 500
   one = 1.0/size
 
-  # stp = 5e-6
-  stp = 5e-5
+  stp = one*0.02
   spring_stp = 2
   reject_stp = 0.1
 
@@ -102,7 +102,7 @@ def main():
   spring_reject_rad = node_rad*1.9
   spring_attract_rad = node_rad*2.0
   inner_influence_rad = 2.0*node_rad
-  outer_influence_rad = 12.0*node_rad
+  outer_influence_rad = 11.0*node_rad
 
   DL = DifferentialLattice(
     size,
@@ -115,11 +115,12 @@ def main():
     spring_attract_rad,
     inner_influence_rad,
     outer_influence_rad,
-    threads=threads,
-    nmax=300000
+    threads = threads,
+    zone_leap = zone_leap,
+    nmax = 50000000
   )
 
-  DL.spawn(200, xy=array([[0.5,0.5]]),dst=node_rad*0.8, rad=0.01)
+  spawn_circle(DL, 200, xy=array([[0.5,0.5]]), dst=node_rad*0.8, rad=0.01)
 
   render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors))
   render.start()

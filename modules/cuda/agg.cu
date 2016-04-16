@@ -1,3 +1,5 @@
+#define THREADS _THREADS_
+
 __global__ void agg(
   int n,
   int nz,
@@ -7,7 +9,6 @@ __global__ void agg(
   int *zone_node,
   int *tmp
 ){
-  // THREADS is replaced by helpers.load_kernel
   const int i = blockIdx.x*THREADS + threadIdx.x;
 
   if (i>=n){

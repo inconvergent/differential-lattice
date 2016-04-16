@@ -2,17 +2,12 @@
 
 from __future__ import print_function
 
-import pycuda.autoinit
-import pycuda.driver as drv
 
 from numpy import pi
-
 from numpy import zeros
 from numpy import column_stack
 from numpy import sin
 from numpy import cos
-from numpy import mean
-
 from numpy.random import random
 
 from numpy import float32
@@ -44,6 +39,7 @@ class DifferentialLattice(object):
       inner_influence_rad,
       outer_influence_rad,
       threads = 256,
+      zone_leap = 200,
       nmax = 100000
     ):
 
@@ -56,14 +52,13 @@ class DifferentialLattice(object):
 
     self.one = 1.0/size
 
-    self.zone_leap = 200 # hard coded in step.cu
-
     self.stp = stp
     self.spring_stp = spring_stp
     self.reject_stp = reject_stp
     self.spring_attract_rad = spring_attract_rad
     self.spring_reject_rad = spring_reject_rad
     self.max_capacity = max_capacity
+    self.zone_leap = zone_leap
     self.node_rad = node_rad
     self.inner_influence_rad = inner_influence_rad
     self.outer_influence_rad = outer_influence_rad
@@ -89,25 +84,22 @@ class DifferentialLattice(object):
 
   def __cuda_init(self):
 
+    import pycuda.autoinit
     from helpers import load_kernel
 
-    self.cuda_step = load_kernel('modules/cuda/step.cu', 'step', threads=self.threads)
-    self.cuda_agg = load_kernel('modules/cuda/agg.cu', 'agg', threads=self.threads)
-
-  def spawn(self, n, xy, dst, rad=0.4):
-
-    num = self.num
-
-    # from dddUtils.random import darts
-    # new_xy = darts(n, 0.5, 0.5, rad, dst)
-    theta = random(n)*TWOPI
-    new_xy = xy + column_stack([cos(theta), sin(theta)])*rad
-    new_num = len(new_xy)
-    if new_num>0:
-      self.xy[num:num+new_num,:] = new_xy
-
-    self.num += new_num
-    return new_num
+    self.cuda_agg = load_kernel(
+      'modules/cuda/agg.cu',
+      'agg',
+      subs={'_THREADS_': self.threads}
+    )
+    self.cuda_step = load_kernel(
+      'modules/cuda/step.cu',
+      'step',
+      subs={
+        '_THREADS_': self.threads,
+        '_PROX_': self.zone_leap
+      }
+    )
 
   def cand_spawn(self, ratio):
 
@@ -127,6 +119,8 @@ class DifferentialLattice(object):
     return 0
 
   def forces(self, t=None):
+
+    import pycuda.driver as drv
 
     self.itt += 1
 
@@ -185,7 +179,4 @@ class DifferentialLattice(object):
 
     if not self.itt%20:
       print('max cands', max(self.tmp[:num,0]))
-
-    # if not blocks*self.threads>num:
-      # raise ValueError()
 
