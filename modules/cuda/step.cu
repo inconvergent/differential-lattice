@@ -8,6 +8,8 @@ __global__ void step(
   float *xy,
   float *dxy,
   int *tmp,
+  int *links,
+  int *link_counts,
   int *zone_num,
   int *zone_node,
   float stp,
@@ -16,7 +18,8 @@ __global__ void step(
   float spring_reject_rad,
   float spring_attract_rad,
   int max_capacity,
-  float max_rad
+  float max_rad,
+  int do_export
 ){
   const int i = blockIdx.x*THREADS + threadIdx.x;
 
@@ -38,7 +41,7 @@ __global__ void step(
   int aa;
   int zk;
 
-  int edge_count = 0;
+  int link_count = 0;
   int cand_count = 0;
   int total_count = 0;
 
@@ -90,7 +93,8 @@ __global__ void step(
       dy /= dd;
 
       if (linked){
-        edge_count += 1;
+        links[10*i+link_count] = jj/2;
+        link_count += 1;
         if (dd>spring_attract_rad){
           sx += -dx*spring_stp;
           sy += -dy*spring_stp;
@@ -110,6 +114,7 @@ __global__ void step(
   dxy[ii] = sx*stp;
   dxy[ii+1] = sy*stp;
   tmp[i] = cand_count;
+  link_counts[i] = link_count;
 
 }
 

@@ -10,16 +10,14 @@ from numpy import sin
 from numpy import cos
 from numpy.random import random
 
-from numpy import float32
-from numpy import int32
+from numpy import float32 as npfloat
+from numpy import int32 as npint
+from numpy import bool as npbool
 
 
 TWOPI = pi*2
 PI = pi
 HPI = pi*0.5
-
-npfloat = float32
-npint = int32
 
 
 
@@ -36,7 +34,6 @@ class DifferentialLattice(object):
       node_rad,
       spring_reject_rad,
       spring_attract_rad,
-      inner_influence_rad,
       outer_influence_rad,
       threads = 256,
       zone_leap = 200,
@@ -60,7 +57,6 @@ class DifferentialLattice(object):
     self.max_capacity = max_capacity
     self.zone_leap = zone_leap
     self.node_rad = node_rad
-    self.inner_influence_rad = inner_influence_rad
     self.outer_influence_rad = outer_influence_rad
 
     self.__init()
@@ -79,6 +75,8 @@ class DifferentialLattice(object):
     self.dxy = zeros((nmax, 2), npfloat)
     self.potential = zeros((nmax, 1), 'bool')
     self.tmp = zeros((nmax, 1), npint)
+    self.link_counts = zeros((nmax, 1), npint)
+    self.links = zeros((10*nmax, 1), npint)
     self.zone_num = zeros(self.nz2, npint)
     self.zone_node = zeros(self.nz2*self.zone_leap, npint)
 
@@ -118,7 +116,30 @@ class DifferentialLattice(object):
 
     return 0
 
-  def forces(self, t=None):
+  def link_export(self, fn='out.2obj'):
+
+    from numpy import row_stack
+
+    num = self.num
+    links = self.links[:num*10, 0]
+
+    edges = set()
+    for i, c in enumerate(self.link_counts[:num,0]):
+      for k in xrange(c):
+
+        j = links[10*i+k]
+        if i<j:
+          lnk = (i, j)
+        else:
+          lnk = (j, i)
+
+        if lnk not in edges:
+          edges.add(lnk)
+
+    return self.xy[:num,:], row_stack(list(edges))
+
+
+  def step(self, export=False, t=None):
 
     import pycuda.driver as drv
 
@@ -156,6 +177,8 @@ class DifferentialLattice(object):
       drv.In(xy[:num,:]),
       drv.Out(dxy[:num,:]),
       drv.Out(self.tmp[:num,:]),
+      drv.Out(self.links[:num*10,:]),
+      drv.Out(self.link_counts[:num,:]),
       drv.In(self.zone_num),
       drv.In(self.zone_node),
       npfloat(self.stp),
@@ -165,6 +188,7 @@ class DifferentialLattice(object):
       npfloat(self.spring_attract_rad),
       npint(self.max_capacity),
       npfloat(self.outer_influence_rad),
+      npint(0),
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
@@ -179,4 +203,8 @@ class DifferentialLattice(object):
 
     if not self.itt%20:
       print('max cands', max(self.tmp[:num,0]))
+
+    self.cand_spawn(ratio=0.1)
+    if t:
+      t.t('spwn')
 
