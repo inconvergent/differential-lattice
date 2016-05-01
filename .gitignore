@@ -6,3 +6,6 @@ profile.profile
 .ropeproject
 build
 profile/*
+*.2obj
+*.gif
+

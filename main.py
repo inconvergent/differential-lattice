@@ -21,15 +21,12 @@ def get_wrap(dl, colors, export_steps=10):
   from numpy import pi
   from fn import Fn
   from modules.timers import named_sub_timers
-  # from dddUtils.ioOBJ import export_2d as export
-  # export('lattice', fn, self.xy[:num,:], edges=)
+  from dddUtils.ioOBJ import export_2d as export
 
 
   twopi = pi*2
 
   t = named_sub_timers('dl')
-
-  xy = dl.xy
 
   fn = Fn(prefix='./res/')
 
@@ -46,7 +43,6 @@ def get_wrap(dl, colors, export_steps=10):
     t.p()
     num = dl.num
 
-    vertices, edges = dl.link_export(fn=fn.name()+'.2obj')
 
     arc = render.ctx.arc
     line_to = render.ctx.line_to
@@ -57,24 +53,28 @@ def get_wrap(dl, colors, export_steps=10):
     render.clear_canvas()
     render.set_line_width(2*dl.one)
 
-    ## dots
-
+    vertices, edges = dl.link_export()
 
     ## edges
-
     # render.ctx.set_source_rgba(*colors['cyan'])
+
+    # render.ctx.set_source_rgba(*colors['light'])
     render.ctx.set_source_rgba(*colors['front'])
+    # for a,b in edges:
+      # move_to(*vertices[a,:])
+      # line_to(*vertices[b,:])
+      # stroke()
 
-    for a,b in edges:
-      move_to(*vertices[a,:])
-      line_to(*vertices[b,:])
-      stroke()
-
+    # render.ctx.set_source_rgba(*colors['front'])
+    ## dots
+    # render.ctx.set_source_rgba(*colors['cyan'])
     for i in xrange(num):
-      arc(xy[i,0], xy[i,1], 0.9*dl.node_rad, 0, twopi)
+      arc(vertices[i,0], vertices[i,1], 0.9*dl.node_rad, 0, twopi)
       fill()
 
-    render.write_to_png(fn.name()+'.png')
+    name = fn.name()
+    render.write_to_png(name+'.png')
+    export('lattice', name+'.2obj', vertices, edges=edges)
 
     return res
 
@@ -99,21 +99,25 @@ def main():
   threads = 512
   zone_leap = 512
 
-  export_steps = 4
+  export_steps = 15
 
-  size = 500
+  size = 1200
   one = 1.0/size
 
-  stp = one*0.08
-  spring_stp = 2
+  stp = one*0.03
+  spring_stp = 5
   reject_stp = 0.1
+
 
   max_capacity = 30
 
-  node_rad = 3*one
+  node_rad = 2.0*one
   spring_reject_rad = node_rad*1.9
   spring_attract_rad = node_rad*2.0
-  outer_influence_rad = 13.0*node_rad
+  outer_influence_rad = 15.0*node_rad
+
+  # link_ignore_rad = spring_attract_rad*2.0
+  link_ignore_rad = 2.0 # use a number larger than one to disable this effect entirely
 
   DL = DifferentialLattice(
     size,
@@ -125,12 +129,13 @@ def main():
     spring_reject_rad,
     spring_attract_rad,
     outer_influence_rad,
+    link_ignore_rad = link_ignore_rad,
     threads = threads,
     zone_leap = zone_leap,
     nmax = 50000000
   )
 
-  spawn_circle(DL, 20, xy=array([[0.5,0.5]]), dst=node_rad*0.8, rad=0.01)
+  spawn_circle(DL, 200, xy=array([[0.5,0.5]]), dst=node_rad*0.8, rad=0.01)
 
   render = Animate(size, colors['back'], colors['front'], get_wrap(DL, colors, export_steps))
   render.start()

@@ -35,6 +35,7 @@ class DifferentialLattice(object):
       spring_reject_rad,
       spring_attract_rad,
       outer_influence_rad,
+      link_ignore_rad = 2.0,
       threads = 256,
       zone_leap = 200,
       nmax = 100000
@@ -58,6 +59,7 @@ class DifferentialLattice(object):
     self.zone_leap = zone_leap
     self.node_rad = node_rad
     self.outer_influence_rad = outer_influence_rad
+    self.link_ignore_rad = link_ignore_rad
 
     self.__init()
     self.__cuda_init()
@@ -116,7 +118,7 @@ class DifferentialLattice(object):
 
     return 0
 
-  def link_export(self, fn='out.2obj'):
+  def link_export(self):
 
     from numpy import row_stack
 
@@ -137,7 +139,6 @@ class DifferentialLattice(object):
           edges.add(lnk)
 
     return self.xy[:num,:], row_stack(list(edges))
-
 
   def step(self, export=False, t=None):
 
@@ -188,6 +189,7 @@ class DifferentialLattice(object):
       npfloat(self.spring_attract_rad),
       npint(self.max_capacity),
       npfloat(self.outer_influence_rad),
+      npfloat(self.link_ignore_rad),
       npint(0),
       block=(self.threads,1,1),
       grid=(blocks,1)
