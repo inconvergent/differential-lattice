@@ -30,6 +30,7 @@ class DifferentialLattice(object):
       stp,
       spring_stp,
       reject_stp,
+      cohesion_stp,
       max_capacity,
       node_rad,
       spring_reject_rad,
@@ -53,6 +54,7 @@ class DifferentialLattice(object):
     self.stp = stp
     self.spring_stp = spring_stp
     self.reject_stp = reject_stp
+    self.conhesion_stp = cohesion_stp
     self.spring_attract_rad = spring_attract_rad
     self.spring_reject_rad = spring_reject_rad
     self.max_capacity = max_capacity
@@ -185,6 +187,7 @@ class DifferentialLattice(object):
       npfloat(self.stp),
       npfloat(self.reject_stp),
       npfloat(self.spring_stp),
+      npfloat(self.conhesion_stp),
       npfloat(self.spring_reject_rad),
       npfloat(self.spring_attract_rad),
       npint(self.max_capacity),
@@ -207,6 +210,7 @@ class DifferentialLattice(object):
       print('max cands', max(self.tmp[:num,0]))
 
     self.cand_spawn(ratio=0.1)
+
     if t:
       t.t('spwn')
 

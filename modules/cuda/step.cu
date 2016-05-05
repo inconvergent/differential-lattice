@@ -15,6 +15,7 @@ __global__ void step(
   float stp,
   float reject_stp,
   float spring_stp,
+  float cohesion_stp,
   float spring_reject_rad,
   float spring_attract_rad,
   int max_capacity,
@@ -128,8 +129,8 @@ __global__ void step(
   my = my/(float)cand_count - xy[ii+1];
   mm = sqrt(mx*mx + my*my);
 
-  mx *= -0.2f/mm;
-  my *= -0.2f/mm;
+  mx *= -cohesion_stp/mm;
+  my *= -cohesion_stp/mm;
   /*mx *= 0.0;*/
   /*my *= 0.0;*/
 

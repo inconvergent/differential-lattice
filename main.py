@@ -51,7 +51,7 @@ def get_wrap(dl, colors, export_steps=10):
     stroke = render.ctx.stroke
 
     render.clear_canvas()
-    render.set_line_width(2*dl.one)
+    render.set_line_width(dl.one)
 
     vertices, edges = dl.link_export()
 
@@ -69,12 +69,12 @@ def get_wrap(dl, colors, export_steps=10):
     ## dots
     # render.ctx.set_source_rgba(*colors['cyan'])
     for i in xrange(num):
-      arc(vertices[i,0], vertices[i,1], 0.9*dl.node_rad, 0, twopi)
+      arc(vertices[i,0], vertices[i,1], 0.5*dl.node_rad, 0, twopi)
       fill()
 
     name = fn.name()
     render.write_to_png(name+'.png')
-    export('lattice', name+'.2obj', vertices, edges=edges)
+    # export('lattice', name+'.2obj', vertices, edges=edges)
 
     return res
 
@@ -99,31 +99,32 @@ def main():
   threads = 512
   zone_leap = 512
 
-  export_steps = 15
+  export_steps = 50
 
-  size = 1200
+  size = 512*2
   one = 1.0/size
 
   stp = one*0.03
   spring_stp = 5
   reject_stp = 0.1
-
+  cohesion_stp = 1.0
 
   max_capacity = 30
 
-  node_rad = 2.0*one
+  node_rad = 1.5*one
   spring_reject_rad = node_rad*1.9
   spring_attract_rad = node_rad*2.0
-  outer_influence_rad = 15.0*node_rad
+  outer_influence_rad = 10.0*node_rad
 
   # link_ignore_rad = spring_attract_rad*2.0
-  link_ignore_rad = 2.0 # use a number larger than one to disable this effect entirely
+  link_ignore_rad = outer_influence_rad # use a number larger than one to disable this effect entirely
 
   DL = DifferentialLattice(
     size,
     stp,
     spring_stp,
     reject_stp,
+    cohesion_stp,
     max_capacity,
     node_rad,
     spring_reject_rad,
