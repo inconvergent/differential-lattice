@@ -2,26 +2,26 @@
 #define PROX _PROX_
 
 __global__ void step(
-  int n,
-  int nz,
-  int zone_leap,
-  float *xy,
+  const int n,
+  const int nz,
+  const int zone_leap,
+  const float *xy,
   float *dxy,
   int *tmp,
   int *links,
   int *link_counts,
-  int *zone_num,
-  int *zone_node,
-  float stp,
-  float reject_stp,
-  float spring_stp,
-  float cohesion_stp,
-  float spring_reject_rad,
-  float spring_attract_rad,
-  int max_capacity,
-  float max_rad,
-  float link_ignore_rad,
-  int do_export
+  const int *zone_num,
+  const int *zone_node,
+  const float stp,
+  const float reject_stp,
+  const float spring_stp,
+  const float cohesion_stp,
+  const float spring_reject_rad,
+  const float spring_attract_rad,
+  const int max_capacity,
+  const float max_rad,
+  const float link_ignore_rad,
+  const int do_export
 ){
   const int i = blockIdx.x*THREADS + threadIdx.x;
 
@@ -131,8 +131,6 @@ __global__ void step(
 
   mx *= -cohesion_stp/mm;
   my *= -cohesion_stp/mm;
-  /*mx *= 0.0;*/
-  /*my *= 0.0;*/
 
   dxy[ii] = (sx+mx)*stp;
   dxy[ii+1] = (sy+my)*stp;

@@ -6,49 +6,44 @@ from __future__ import print_function
 
 
 
-def get_step(t=None):
-
-  def step(dl):
-
-    dl.step(t)
-
-    return True
-
-  return step
-
 def get_wrap(dl, colors, export_steps=10):
 
   from numpy import pi
   from fn import Fn
   from modules.timers import named_sub_timers
-  from dddUtils.ioOBJ import export_2d as export
+  # from dddUtils.ioOBJ import export_2d as export
 
 
   twopi = pi*2
 
-  t = named_sub_timers('dl')
+  # t = named_sub_timers('dl')
+  t = None
 
   fn = Fn(prefix='./res/')
 
-  step = get_step(t)
-
   def wrap(render):
 
-    res = step(dl)
+    dl.step(t)
 
-    if dl.itt % export_steps != 0:
-      return res
+    dl.spawn(ratio=0.1, age=1000)
+
+    if t:
+      t.t('spwn')
+
+    if not dl.itt % export_steps == 0:
+      return True
 
     print('itt', dl.itt, 'num', dl.num)
-    t.p()
+    if t:
+      t.p()
     num = dl.num
 
 
     arc = render.ctx.arc
-    line_to = render.ctx.line_to
-    move_to = render.ctx.move_to
     fill = render.ctx.fill
-    stroke = render.ctx.stroke
+    # line_to = render.ctx.line_to
+    # move_to = render.ctx.move_to
+    # stroke = render.ctx.stroke
 
     render.clear_canvas()
     render.set_line_width(dl.one)
@@ -76,7 +71,7 @@ def get_wrap(dl, colors, export_steps=10):
     render.write_to_png(name+'.png')
     # export('lattice', name+'.2obj', vertices, edges=edges)
 
-    return res
+    return True
 
   return wrap
 
@@ -107,7 +102,7 @@ def main():
   stp = one*0.03
   spring_stp = 5
   reject_stp = 0.1
-  cohesion_stp = 1.0
+  cohesion_stp = 0.0
 
   max_capacity = 30
 

@@ -1,13 +1,12 @@
 #define THREADS _THREADS_
 
 __global__ void agg(
-  int n,
-  int nz,
-  int zone_leap,
-  float *xy,
+  const int n,
+  const int nz,
+  const int zone_leap,
+  const float *xy,
   int *zone_num,
-  int *zone_node,
-  int *tmp
+  int *zone_node
 ){
   const int i = blockIdx.x*THREADS + threadIdx.x;
 

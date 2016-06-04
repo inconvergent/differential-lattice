@@ -12,7 +12,9 @@ from numpy.random import random
 
 from numpy import float32 as npfloat
 from numpy import int32 as npint
-from numpy import bool as npbool
+# from numpy import bool as npbool
+from numpy import logical_and
+from numpy import logical_not
 
 
 TWOPI = pi*2
@@ -54,7 +56,7 @@ class DifferentialLattice(object):
     self.stp = stp
     self.spring_stp = spring_stp
     self.reject_stp = reject_stp
-    self.conhesion_stp = cohesion_stp
+    self.cohesion_stp = cohesion_stp
     self.spring_attract_rad = spring_attract_rad
     self.spring_reject_rad = spring_reject_rad
     self.max_capacity = max_capacity
@@ -83,6 +85,7 @@ class DifferentialLattice(object):
     self.links = zeros((10*nmax, 1), npint)
     self.zone_num = zeros(self.nz2, npint)
     self.zone_node = zeros(self.nz2*self.zone_leap, npint)
+    self.age = zeros((self.nmax,1), npint)
 
   def __cuda_init(self):
 
@@ -103,10 +106,18 @@ class DifferentialLattice(object):
       }
     )
 
-  def cand_spawn(self, ratio):
+  def spawn(self, ratio, age=None):
 
     num = self.num
+
+    self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
+
     inds = self.potential[:num,0].nonzero()[0]
+
+    if age is not None:
+      mask = self.age[inds,0]>self.itt-age
+      inds = inds[mask]
+
     selected = inds[random(len(inds))<ratio]
 
     new_num = len(selected)
@@ -116,9 +127,28 @@ class DifferentialLattice(object):
       offset = column_stack([cos(theta), sin(theta)])*self.node_rad*0.5
       self.xy[num:num+new_num,:] = new_xy+offset
       self.num += new_num
-      return new_num
+      self.age[num:num+new_num] = self.itt
+
+    if age is not None:
+      self.decay(age)
 
     return 0
+
+  def decay(self, age, ratio=0.01):
+
+    num = self.num
+    die = logical_and(
+      self.age[:num,0]<self.itt-age,
+      self.link_counts[:num,0]<1
+    )
+    alive = logical_not(logical_and(die, random(len(die))<ratio))
+
+    inds = alive.nonzero()[0]
+
+    new_num = len(inds)
+
+    self.xy[:new_num,:] = self.xy[inds,:]
+    self.num = new_num
 
   def link_export(self):
 
@@ -142,6 +172,7 @@ class DifferentialLattice(object):
 
     return self.xy[:num,:], row_stack(list(edges))
 
+
   def step(self, export=False, t=None):
 
     import pycuda.driver as drv
@@ -151,7 +182,7 @@ class DifferentialLattice(object):
     num = self.num
     xy = self.xy
     dxy = self.dxy
-    blocks = (num)//self.threads + 1
+    blocks = num//self.threads + 1
 
     self.zone_num[:] = 0
 
@@ -165,7 +196,6 @@ class DifferentialLattice(object):
       drv.In(xy[:num,:]),
       drv.InOut(self.zone_num),
       drv.InOut(self.zone_node),
-      drv.Out(self.tmp[:num,0]),
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
@@ -187,7 +217,7 @@ class DifferentialLattice(object):
       npfloat(self.stp),
       npfloat(self.reject_stp),
       npfloat(self.spring_stp),
-      npfloat(self.conhesion_stp),
+      npfloat(self.cohesion_stp),
       npfloat(self.spring_reject_rad),
       npfloat(self.spring_attract_rad),
       npint(self.max_capacity),
@@ -202,15 +232,7 @@ class DifferentialLattice(object):
       t.t('kern2')
 
     xy[:num,:] += dxy[:num,:]
-    self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
+
     if t:
       t.t('inc')
-
-    if not self.itt%20:
-      print('max cands', max(self.tmp[:num,0]))
-
-    self.cand_spawn(ratio=0.1)
-
-    if t:
-      t.t('spwn')
 
