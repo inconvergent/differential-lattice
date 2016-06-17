@@ -1,5 +1,63 @@
 #define THREADS _THREADS_
-#define PROX _PROX_
+
+__device__ float dist(const float *a, const float *b, const int ii, const int jj){
+    return sqrt(powf(a[ii]-b[jj], 2.0f)+powf(a[ii+1]-b[jj+1], 2.0f));
+}
+
+__device__ int calc_zones(const int za, const int zb, const int nz, int *Z){
+  int num = 0;
+  for (int a=max(za-1,0);a<min(za+2,nz);a++){
+    for (int b=max(zb-1,0);b<min(zb+2,nz);b++){
+      Z[num] = a*nz+b;
+      num += 1;
+    }
+  }
+  return num;
+}
+
+__device__ bool is_relative(
+  const int ZN,
+  const int *Z,
+  const int zone_leap,
+  const int *zone_num,
+  const int *zone_node,
+  const float link_ignore_rad,
+  const float *xy,
+  const int ii,
+  const int jj
+){
+
+  int uu;
+  int z;
+
+  if (ii == jj){
+    return false;
+  }
+
+  float dd = dist(xy, xy, ii, jj);
+
+  if (dd>link_ignore_rad){
+    return false;
+  }
+
+  for (int zk=0;zk<ZN;zk++){
+    z = Z[zk];
+    for (int k=0;k<zone_num[z];k++){
+
+      uu = 2*zone_node[z*zone_leap+k];
+
+      if (jj == uu){
+        continue;
+      }
+
+      if (dd>max(dist(xy, xy, ii, uu), dist(xy, xy, jj, uu))){
+        return false;
+      }
+
+    }
+  }
+  return true;
+}
 
 __global__ void step(
   const int n,
@@ -29,8 +87,11 @@ __global__ void step(
   }
 
   const int ii = 2*i;
-  const int zi = (int) floor(xy[ii]*nz);
-  const int zj = (int) floor(xy[ii+1]*nz);
+
+  int Z[9];
+  const int za = (int)floor(xy[ii]*nz);
+  const int zb = (int)floor(xy[ii+1]*nz);
+  const int ZN = calc_zones(za, zb, nz, Z);
 
   float sx = 0.0f;
   float sy = 0.0f;
@@ -43,61 +104,44 @@ __global__ void step(
   float mm = 0.0f;
 
 
+  int z;
   int jj;
-  int aa;
-  int zk;
 
   int link_count = 0;
   int cand_count = 0;
-  int total_count = 0;
+  bool linked = true;
 
-  bool linked;
+  for (int zk=0;zk<ZN;zk++){
+    z = Z[zk];
+    for (int k=0;k<zone_num[z];k++){
 
-  int proximity[PROX];
+      jj = 2*zone_node[z*zone_leap+k];
 
-  for (int a=max(zi-1,0);a<min(zi+2,nz);a++){
-    for (int b=max(zj-1,0);b<min(zj+2,nz);b++){
-      zk = a*nz+b;
-      for (int k=0;k<zone_num[zk];k++){
-        jj = 2*zone_node[zk*zone_leap+k];
-        total_count += 1;
-        dx = xy[ii] - xy[jj];
-        dy = xy[ii+1] - xy[jj+1];
-        dd = sqrt(dx*dx + dy*dy);
-        if (dd<outer_influence_rad && dd>0.0f){
-          proximity[cand_count] = jj/2;
-          cand_count += 1;
-        }
+      if (jj==ii){
+        continue;
       }
-    }
-  }
 
-  for (int k=0;k<cand_count;k++){
+      linked = is_relative(
+        ZN,
+        Z,
+        zone_leap,
+        zone_num,
+        zone_node,
+        link_ignore_rad,
+        xy,
+        ii,
+        jj
+      );
 
-    jj = 2*proximity[k];
+      dx = xy[ii] - xy[jj];
+      dy = xy[ii+1] - xy[jj+1];
+      dd = sqrt(dx*dx + dy*dy);
 
-    dx = xy[ii] - xy[jj];
-    dy = xy[ii+1] - xy[jj+1];
-    dd = sqrt(dx*dx + dy*dy);
-
-    linked = true;
-    for (int l=0;l<cand_count;l++){
-      aa = 2*proximity[l];
-      if (dd>link_ignore_rad){
-        linked = false;
-        break;
+      if (dd<=0.0f || dd>outer_influence_rad){
+        continue;
       }
-      if (dd>max(
-          sqrt(powf(xy[ii] - xy[aa],2.0f) + powf(xy[ii+1] - xy[aa+1],2.0f)),
-          sqrt(powf(xy[jj] - xy[aa],2.0f) + powf(xy[jj+1] - xy[aa+1],2.0f))
-        )
-      ){
-        linked = false;
-        break;
-      }
-    }
 
-    if (dd>0.0f){
+      cand_count += 1;
 
       dx /= dd;
       dy /= dd;

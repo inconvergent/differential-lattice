@@ -1,13 +1,10 @@
 #define THREADS _THREADS_
 
-__global__ void agg(
-  int n,
-  int nz,
-  int zone_leap,
-  float *xy,
-  int *zone_num,
-  int *zone_node,
-  int *zone
+__global__ void agg_count(
+  const int n,
+  const int nz,
+  const float *xy,
+  int *zone_num
 ){
   const int i = blockIdx.x*THREADS + threadIdx.x;
 
@@ -20,8 +17,6 @@ __global__ void agg(
   const int zj = (int) floor(xy[ii+1]*nz);
   const int z = zi*nz + zj;
 
-  zone[i] = z;
-  const int o = atomicAdd(&zone_num[z], 1);
-  zone_node[z*zone_leap+o] = i;
-
+  atomicAdd(&zone_num[z], 1);
 }
+

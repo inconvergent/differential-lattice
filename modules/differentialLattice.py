@@ -12,7 +12,10 @@ from numpy.random import random
 
 from numpy import float32 as npfloat
 from numpy import int32 as npint
-# from numpy import bool as npbool
+
+from timers import named_sub_timers
+
+
 from numpy import logical_and
 from numpy import logical_not
 
@@ -40,7 +43,6 @@ class DifferentialLattice(object):
       outer_influence_rad,
       link_ignore_rad,
       threads = 256,
-      zone_leap = 200,
       nmax = 100000
     ):
 
@@ -53,6 +55,8 @@ class DifferentialLattice(object):
 
     self.one = 1.0/size
 
+    self.timer = named_sub_timers('lattice')
+
     assert spring_attract_rad<=outer_influence_rad
     assert spring_reject_rad<=outer_influence_rad
     assert link_ignore_rad<=outer_influence_rad
@@ -64,15 +68,9 @@ class DifferentialLattice(object):
     self.spring_attract_rad = spring_attract_rad
     self.spring_reject_rad = spring_reject_rad
     self.max_capacity = max_capacity
-    self.zone_leap = zone_leap
     self.node_rad = node_rad
     self.outer_influence_rad = outer_influence_rad
     self.link_ignore_rad = link_ignore_rad
-
-    self.__init()
-    self.__cuda_init()
-
-  def __init(self):
 
     self.num = 0
 
@@ -87,26 +85,39 @@ class DifferentialLattice(object):
     self.tmp = zeros((nmax, 1), npint)
     self.link_counts = zeros((nmax, 1), npint)
     self.links = zeros((10*nmax, 1), npint)
-    self.zone_num = zeros(self.nz2, npint)
-    self.zone_node = zeros(self.nz2*self.zone_leap, npint)
     self.age = zeros((self.nmax,1), npint)
+
+    self.zone = zeros(nmax, npint)
+
+    zone_map_size = self.nz2*64
+    self.zone_node = zeros(zone_map_size, npint)
+
+    self.zone_num = zeros(self.nz2, npint)
+
+    self.__cuda_init()
 
   def __cuda_init(self):
 
     import pycuda.autoinit
     from helpers import load_kernel
 
+    self.cuda_agg_count = load_kernel(
+      'modules/cuda/agg_count.cu',
+      'agg_count',
+      subs = {'_THREADS_': self.threads}
+    )
+
     self.cuda_agg = load_kernel(
       'modules/cuda/agg.cu',
       'agg',
-      subs={'_THREADS_': self.threads}
+      subs = {'_THREADS_': self.threads}
     )
+
     self.cuda_step = load_kernel(
       'modules/cuda/step.cu',
       'step',
       subs={
-        '_THREADS_': self.threads,
-        '_PROX_': self.zone_leap
+        '_THREADS_': self.threads
       }
     )
 
@@ -176,6 +187,52 @@ class DifferentialLattice(object):
 
     return self.xy[:num,:], row_stack(list(edges))
 
+  def __make_zonemap(self):
+
+    from pycuda.driver import In
+    from pycuda.driver import Out
+    from pycuda.driver import InOut
+
+    num = self.num
+    xy = self.xy[:num, :]
+
+    zone_num = self.zone_num
+    zone = self.zone
+
+    zone_num[:] = 0
+
+    self.cuda_agg_count(
+      npint(num),
+      npint(self.nz),
+      In(xy),
+      InOut(zone_num),
+      block=(self.threads,1,1),
+      grid=(num//self.threads + 1,1)
+    )
+
+    zone_leap = zone_num[:].max()
+    zone_map_size = self.nz2*zone_leap
+
+    if zone_map_size>len(self.zone_node):
+      print('resize, new zone leap: ', zone_map_size*2./self.nz2)
+      self.zone_node = zeros(zone_map_size*2, npint)
+
+    self.zone_node[:] = 0
+    zone_num[:] = 0
+
+    self.cuda_agg(
+      npint(num),
+      npint(self.nz),
+      npint(zone_leap),
+      In(xy),
+      InOut(zone_num),
+      InOut(self.zone_node),
+      Out(zone[:num]),
+      block=(self.threads,1,1),
+      grid=(num//self.threads + 1,1)
+    )
+
+    return zone_leap, self.zone_node, zone_num
 
   def step(self):
 
@@ -186,32 +243,24 @@ class DifferentialLattice(object):
     num = self.num
     xy = self.xy
     dxy = self.dxy
-    blocks = num//self.threads + 1
 
-    self.zone_num[:] = 0
+    self.timer.start()
 
-    self.cuda_agg(
-      npint(num),
-      npint(self.nz),
-      npint(self.zone_leap),
-      drv.In(xy[:num,:]),
-      drv.InOut(self.zone_num),
-      drv.InOut(self.zone_node),
-      block=(self.threads,1,1),
-      grid=(blocks,1)
-    )
+    zone_leap, zone_node, zone_num = self.__make_zonemap()
+
+    self.timer.t('zone')
 
     self.cuda_step(
       npint(num),
       npint(self.nz),
-      npint(self.zone_leap),
+      npint(zone_leap),
       drv.In(xy[:num,:]),
       drv.Out(dxy[:num,:]),
       drv.Out(self.tmp[:num,:]),
       drv.Out(self.links[:num*10,:]),
       drv.Out(self.link_counts[:num,:]),
-      drv.In(self.zone_num),
-      drv.In(self.zone_node),
+      drv.In(zone_num),
+      drv.In(zone_node),
       npfloat(self.stp),
       npfloat(self.reject_stp),
       npfloat(self.spring_stp),
@@ -222,8 +271,14 @@ class DifferentialLattice(object):
       npfloat(self.outer_influence_rad),
       npfloat(self.link_ignore_rad),
       block=(self.threads,1,1),
-      grid=(blocks,1)
+      grid=(num//self.threads+1,1)
     )
 
+    self.timer.t('step')
+
     xy[:num,:] += dxy[:num,:]
+
+    self.timer.t('add')
+
+    self.timer.p()
 

@@ -64,7 +64,6 @@ def main():
   }
 
   threads = 512
-  zone_leap = 512
 
   size = 512
   one = 1.0/size
@@ -88,7 +87,7 @@ def main():
   spring_reject_rad = node_rad*1.9
   spring_attract_rad = node_rad*2.0
   outer_influence_rad = 10.0*node_rad
-  link_ignore_rad = 0.5*outer_influence_rad
+  link_ignore_rad = outer_influence_rad
 
   DL = DifferentialLattice(
     size,
@@ -103,7 +102,6 @@ def main():
     outer_influence_rad,
     link_ignore_rad,
     threads = threads,
-    zone_leap = zone_leap,
     nmax = 50000000
   )
 
