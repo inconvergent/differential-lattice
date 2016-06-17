@@ -38,7 +38,7 @@ class DifferentialLattice(object):
       spring_reject_rad,
       spring_attract_rad,
       outer_influence_rad,
-      link_ignore_rad = 2.0,
+      link_ignore_rad,
       threads = 256,
       zone_leap = 200,
       nmax = 100000
@@ -52,6 +52,10 @@ class DifferentialLattice(object):
     self.size = size
 
     self.one = 1.0/size
+
+    assert spring_attract_rad<=outer_influence_rad
+    assert spring_reject_rad<=outer_influence_rad
+    assert link_ignore_rad<=outer_influence_rad
 
     self.stp = stp
     self.spring_stp = spring_stp
@@ -173,7 +177,7 @@ class DifferentialLattice(object):
     return self.xy[:num,:], row_stack(list(edges))
 
 
-  def step(self, export=False, t=None):
+  def step(self):
 
     import pycuda.driver as drv
 
@@ -186,9 +190,6 @@ class DifferentialLattice(object):
 
     self.zone_num[:] = 0
 
-    if t:
-      t.t('ini')
-
     self.cuda_agg(
       npint(num),
       npint(self.nz),
@@ -199,9 +200,6 @@ class DifferentialLattice(object):
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
-
-    if t:
-      t.t('kern1')
 
     self.cuda_step(
       npint(num),
@@ -223,16 +221,9 @@ class DifferentialLattice(object):
       npint(self.max_capacity),
       npfloat(self.outer_influence_rad),
       npfloat(self.link_ignore_rad),
-      npint(0),
       block=(self.threads,1,1),
       grid=(blocks,1)
     )
 
-    if t:
-      t.t('kern2')
-
     xy[:num,:] += dxy[:num,:]
-
-    if t:
-      t.t('inc')
 

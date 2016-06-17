@@ -19,9 +19,8 @@ __global__ void step(
   const float spring_reject_rad,
   const float spring_attract_rad,
   const int max_capacity,
-  const float max_rad,
-  const float link_ignore_rad,
-  const int do_export
+  const float outer_influence_rad,
+  const float link_ignore_rad
 ){
   const int i = blockIdx.x*THREADS + threadIdx.x;
 
@@ -65,7 +64,7 @@ __global__ void step(
         dx = xy[ii] - xy[jj];
         dy = xy[ii+1] - xy[jj+1];
         dd = sqrt(dx*dx + dy*dy);
-        if (dd<max_rad && dd>0.0f){
+        if (dd<outer_influence_rad && dd>0.0f){
           proximity[cand_count] = jj/2;
           cand_count += 1;
         }
