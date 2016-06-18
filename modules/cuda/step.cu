@@ -23,6 +23,7 @@ __device__ bool is_relative(
   const int *zone_node,
   const float link_ignore_rad,
   const float *xy,
+  const float dd,
   const int ii,
   const int jj
 ){
@@ -33,8 +34,6 @@ __device__ bool is_relative(
   if (ii == jj){
     return false;
   }
-
-  float dd = dist(xy, xy, ii, jj);
 
   if (dd>link_ignore_rad){
     return false;
@@ -103,7 +102,6 @@ __global__ void step(
   float my = 0.0f;
   float mm = 0.0f;
 
-
   int z;
   int jj;
 
@@ -121,6 +119,14 @@ __global__ void step(
         continue;
       }
 
+      dx = xy[ii] - xy[jj];
+      dy = xy[ii+1] - xy[jj+1];
+      dd = sqrt(powf(dx, 2.0f) + powf(dy, 2.0f));
+
+      if (dd<=0.0f || dd>outer_influence_rad){
+        continue;
+      }
+
       linked = is_relative(
         ZN,
         Z,
@@ -129,17 +135,11 @@ __global__ void step(
         zone_node,
         link_ignore_rad,
         xy,
+        dd,
         ii,
         jj
       );
 
-      dx = xy[ii] - xy[jj];
-      dy = xy[ii+1] - xy[jj+1];
-      dd = sqrt(dx*dx + dy*dy);
-
-      if (dd<=0.0f || dd>outer_influence_rad){
-        continue;
-      }
 
       cand_count += 1;
 

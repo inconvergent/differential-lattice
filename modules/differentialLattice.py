@@ -241,8 +241,8 @@ class DifferentialLattice(object):
     self.itt += 1
 
     num = self.num
-    xy = self.xy
-    dxy = self.dxy
+    xy = self.xy[:num,:]
+    dxy = self.dxy[:num,:]
 
     self.timer.start()
 
@@ -254,8 +254,8 @@ class DifferentialLattice(object):
       npint(num),
       npint(self.nz),
       npint(zone_leap),
-      drv.In(xy[:num,:]),
-      drv.Out(dxy[:num,:]),
+      drv.In(xy),
+      drv.Out(dxy),
       drv.Out(self.tmp[:num,:]),
       drv.Out(self.links[:num*10,:]),
       drv.Out(self.link_counts[:num,:]),
@@ -276,7 +276,7 @@ class DifferentialLattice(object):
 
     self.timer.t('step')
 
-    xy[:num,:] += dxy[:num,:]
+    xy += dxy
 
     self.timer.t('add')
 
