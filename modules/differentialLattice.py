@@ -44,7 +44,7 @@ class DifferentialLattice(object):
       link_ignore_rad,
       threads = 256,
       nmax = 100000
-    ):
+      ):
 
     self.itt = 0
 
@@ -82,7 +82,7 @@ class DifferentialLattice(object):
     self.xy = zeros((nmax, 2), npfloat)
     self.dxy = zeros((nmax, 2), npfloat)
     self.potential = zeros((nmax, 1), 'bool')
-    self.tmp = zeros((nmax, 1), npint)
+    self.cand_count = zeros((nmax, 1), npint)
     self.link_counts = zeros((nmax, 1), npint)
     self.links = zeros((10*nmax, 1), npint)
     self.age = zeros((self.nmax,1), npint)
@@ -102,30 +102,30 @@ class DifferentialLattice(object):
     from helpers import load_kernel
 
     self.cuda_agg_count = load_kernel(
-      'modules/cuda/agg_count.cu',
-      'agg_count',
-      subs = {'_THREADS_': self.threads}
-    )
+        'modules/cuda/agg_count.cu',
+        'agg_count',
+        subs = {'_THREADS_': self.threads}
+        )
 
     self.cuda_agg = load_kernel(
-      'modules/cuda/agg.cu',
-      'agg',
-      subs = {'_THREADS_': self.threads}
-    )
+        'modules/cuda/agg.cu',
+        'agg',
+        subs = {'_THREADS_': self.threads}
+        )
 
     self.cuda_step = load_kernel(
-      'modules/cuda/step.cu',
-      'step',
-      subs={
-        '_THREADS_': self.threads
-      }
-    )
+        'modules/cuda/step.cu',
+        'step',
+        subs={
+          '_THREADS_': self.threads
+          }
+        )
 
   def spawn(self, ratio, age=None):
 
     num = self.num
 
-    self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
+    self.potential[:num,0] = self.cand_count[:num,0]<self.max_capacity
 
     inds = self.potential[:num,0].nonzero()[0]
 
@@ -153,9 +153,9 @@ class DifferentialLattice(object):
 
     num = self.num
     die = logical_and(
-      self.age[:num,0]<self.itt-age,
-      self.link_counts[:num,0]<1
-    )
+        self.age[:num,0]<self.itt-age,
+        self.link_counts[:num,0]<1
+        )
     alive = logical_not(logical_and(die, random(len(die))<ratio))
 
     inds = alive.nonzero()[0]
@@ -202,13 +202,13 @@ class DifferentialLattice(object):
     zone_num[:] = 0
 
     self.cuda_agg_count(
-      npint(num),
-      npint(self.nz),
-      In(xy),
-      InOut(zone_num),
-      block=(self.threads,1,1),
-      grid=(num//self.threads + 1,1)
-    )
+        npint(num),
+        npint(self.nz),
+        In(xy),
+        InOut(zone_num),
+        block=(self.threads,1,1),
+        grid=(num//self.threads + 1,1)
+        )
 
     zone_leap = zone_num[:].max()
     zone_map_size = self.nz2*zone_leap
@@ -221,16 +221,16 @@ class DifferentialLattice(object):
     zone_num[:] = 0
 
     self.cuda_agg(
-      npint(num),
-      npint(self.nz),
-      npint(zone_leap),
-      In(xy),
-      InOut(zone_num),
-      InOut(self.zone_node),
-      Out(zone[:num]),
-      block=(self.threads,1,1),
-      grid=(num//self.threads + 1,1)
-    )
+        npint(num),
+        npint(self.nz),
+        npint(zone_leap),
+        In(xy),
+        InOut(zone_num),
+        InOut(self.zone_node),
+        Out(zone[:num]),
+        block=(self.threads,1,1),
+        grid=(num//self.threads + 1,1)
+        )
 
     return zone_leap, self.zone_node, zone_num
 
@@ -251,34 +251,36 @@ class DifferentialLattice(object):
     self.timer.t('zone')
 
     self.cuda_step(
-      npint(num),
-      npint(self.nz),
-      npint(zone_leap),
-      drv.In(xy),
-      drv.Out(dxy),
-      drv.Out(self.tmp[:num,:]),
-      drv.Out(self.links[:num*10,:]),
-      drv.Out(self.link_counts[:num,:]),
-      drv.In(zone_num),
-      drv.In(zone_node),
-      npfloat(self.stp),
-      npfloat(self.reject_stp),
-      npfloat(self.spring_stp),
-      npfloat(self.cohesion_stp),
-      npfloat(self.spring_reject_rad),
-      npfloat(self.spring_attract_rad),
-      npint(self.max_capacity),
-      npfloat(self.outer_influence_rad),
-      npfloat(self.link_ignore_rad),
-      block=(self.threads,1,1),
-      grid=(num//self.threads+1,1)
-    )
+        npint(num),
+        npint(self.nz),
+        npint(zone_leap),
+        drv.In(xy),
+        drv.Out(dxy),
+        drv.Out(self.cand_count[:num,:]),
+        drv.Out(self.links[:num*10,:]),
+        drv.Out(self.link_counts[:num,:]),
+        drv.In(zone_num),
+        drv.In(zone_node),
+        npfloat(self.stp),
+        npfloat(self.reject_stp),
+        npfloat(self.spring_stp),
+        npfloat(self.cohesion_stp),
+        npfloat(self.spring_reject_rad),
+        npfloat(self.spring_attract_rad),
+        npint(self.max_capacity),
+        npfloat(self.outer_influence_rad),
+        npfloat(self.link_ignore_rad),
+        block=(self.threads,1,1),
+        grid=(num//self.threads+1,1)
+        )
 
     self.timer.t('step')
 
     xy += dxy
 
     self.timer.t('add')
+
+    print(self.nz)
 
     self.timer.p()
 

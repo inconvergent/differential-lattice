@@ -64,7 +64,7 @@ __global__ void step(
   const int zone_leap,
   const float *xy,
   float *dxy,
-  int *tmp,
+  int *cand_count,
   int *links,
   int *link_counts,
   const int *zone_num,
@@ -105,8 +105,8 @@ __global__ void step(
   int z;
   int jj;
 
-  int link_count = 0;
-  int cand_count = 0;
+  int num_links = 0;
+  int num_cands = 0;
   bool linked = true;
 
   for (int zk=0;zk<ZN;zk++){
@@ -127,6 +127,8 @@ __global__ void step(
         continue;
       }
 
+      num_cands += 1;
+
       linked = is_relative(
         ZN,
         Z,
@@ -140,9 +142,6 @@ __global__ void step(
         jj
       );
 
-
-      cand_count += 1;
-
       dx /= dd;
       dy /= dd;
 
@@ -150,8 +149,8 @@ __global__ void step(
       my += xy[jj+1];
 
       if (linked){
-        links[10*i+link_count] = jj/2;
-        link_count += 1;
+        links[10*i+num_links] = jj/2;
+        num_links += 1;
         if (dd>spring_attract_rad){
           sx += -dx*spring_stp;
           sy += -dy*spring_stp;
@@ -168,8 +167,8 @@ __global__ void step(
     }
   }
 
-  mx = mx/(float)cand_count - xy[ii];
-  my = my/(float)cand_count - xy[ii+1];
+  mx = mx/(float)num_cands - xy[ii];
+  my = my/(float)num_cands - xy[ii+1];
   mm = sqrt(mx*mx + my*my);
 
   mx *= -cohesion_stp/mm;
@@ -177,8 +176,8 @@ __global__ void step(
 
   dxy[ii] = (sx+mx)*stp;
   dxy[ii+1] = (sy+my)*stp;
-  tmp[i] = cand_count;
-  link_counts[i] = link_count;
+  cand_count[i] = num_cands;
+  link_counts[i] = num_links;
 
 }
 
