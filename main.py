@@ -56,12 +56,12 @@ def main():
   from modules.helpers import spawn_circle
 
   colors = {
-    'back': [1,1,1,1],
-    'front': [0,0,0,0.7],
-    'cyan': [0,0.6,0.6,0.7],
-    'purple': [0.6,0.0,0.6,0.7],
-    'light': [0,0,0,0.2],
-  }
+      'back': [1,1,1,1],
+      'front': [0,0,0,0.7],
+      'cyan': [0,0.6,0.6,0.7],
+      'purple': [0.6,0.0,0.6,0.7],
+      'light': [0,0,0,0.2],
+      }
 
   threads = 512
   zone_leap = 512
@@ -91,21 +91,21 @@ def main():
   link_ignore_rad = 0.5*outer_influence_rad
 
   DL = DifferentialLattice(
-    size,
-    stp,
-    spring_stp,
-    reject_stp,
-    cohesion_stp,
-    max_capacity,
-    node_rad,
-    spring_reject_rad,
-    spring_attract_rad,
-    outer_influence_rad,
-    link_ignore_rad,
-    threads = threads,
-    zone_leap = zone_leap,
-    nmax = 50000000
-  )
+      size,
+      stp,
+      spring_stp,
+      reject_stp,
+      cohesion_stp,
+      max_capacity,
+      node_rad,
+      spring_reject_rad,
+      spring_attract_rad,
+      outer_influence_rad,
+      link_ignore_rad,
+      threads = threads,
+      zone_leap = zone_leap,
+      nmax = 50000000
+      )
 
   spawn_circle(DL, init_num , xy=array([[0.5,0.5]]), dst=node_rad*0.8, rad=0.01)
   wrap = get_wrap(DL, colors, render_steps, export_steps)

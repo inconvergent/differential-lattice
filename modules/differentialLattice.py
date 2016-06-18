@@ -42,7 +42,7 @@ class DifferentialLattice(object):
       threads = 256,
       zone_leap = 200,
       nmax = 100000
-    ):
+      ):
 
     self.itt = 0
 
@@ -97,23 +97,22 @@ class DifferentialLattice(object):
     from helpers import load_kernel
 
     self.cuda_agg = load_kernel(
-      'modules/cuda/agg.cu',
-      'agg',
-      subs={'_THREADS_': self.threads}
-    )
+        'modules/cuda/agg.cu',
+        'agg',
+        subs={'_THREADS_': self.threads}
+        )
     self.cuda_step = load_kernel(
-      'modules/cuda/step.cu',
-      'step',
-      subs={
-        '_THREADS_': self.threads,
-        '_PROX_': self.zone_leap
-      }
-    )
+        'modules/cuda/step.cu',
+        'step',
+        subs={
+          '_THREADS_': self.threads,
+          '_PROX_': self.zone_leap
+          }
+        )
 
   def spawn(self, ratio, age=None):
 
     num = self.num
-
     self.potential[:num,0] = self.tmp[:num,0]<self.max_capacity
 
     inds = self.potential[:num,0].nonzero()[0]
@@ -142,9 +141,9 @@ class DifferentialLattice(object):
 
     num = self.num
     die = logical_and(
-      self.age[:num,0]<self.itt-age,
-      self.link_counts[:num,0]<1
-    )
+        self.age[:num,0]<self.itt-age,
+        self.link_counts[:num,0]<1
+        )
     alive = logical_not(logical_and(die, random(len(die))<ratio))
 
     inds = alive.nonzero()[0]
@@ -191,39 +190,39 @@ class DifferentialLattice(object):
     self.zone_num[:] = 0
 
     self.cuda_agg(
-      npint(num),
-      npint(self.nz),
-      npint(self.zone_leap),
-      drv.In(xy[:num,:]),
-      drv.InOut(self.zone_num),
-      drv.InOut(self.zone_node),
-      block=(self.threads,1,1),
-      grid=(blocks,1)
-    )
+        npint(num),
+        npint(self.nz),
+        npint(self.zone_leap),
+        drv.In(xy[:num,:]),
+        drv.InOut(self.zone_num),
+        drv.InOut(self.zone_node),
+        block=(self.threads,1,1),
+        grid=(blocks,1)
+        )
 
     self.cuda_step(
-      npint(num),
-      npint(self.nz),
-      npint(self.zone_leap),
-      drv.In(xy[:num,:]),
-      drv.Out(dxy[:num,:]),
-      drv.Out(self.tmp[:num,:]),
-      drv.Out(self.links[:num*10,:]),
-      drv.Out(self.link_counts[:num,:]),
-      drv.In(self.zone_num),
-      drv.In(self.zone_node),
-      npfloat(self.stp),
-      npfloat(self.reject_stp),
-      npfloat(self.spring_stp),
-      npfloat(self.cohesion_stp),
-      npfloat(self.spring_reject_rad),
-      npfloat(self.spring_attract_rad),
-      npint(self.max_capacity),
-      npfloat(self.outer_influence_rad),
-      npfloat(self.link_ignore_rad),
-      block=(self.threads,1,1),
-      grid=(blocks,1)
-    )
+        npint(num),
+        npint(self.nz),
+        npint(self.zone_leap),
+        drv.In(xy[:num,:]),
+        drv.Out(dxy[:num,:]),
+        drv.Out(self.tmp[:num,:]),
+        drv.Out(self.links[:num*10,:]),
+        drv.Out(self.link_counts[:num,:]),
+        drv.In(self.zone_num),
+        drv.In(self.zone_node),
+        npfloat(self.stp),
+        npfloat(self.reject_stp),
+        npfloat(self.spring_stp),
+        npfloat(self.cohesion_stp),
+        npfloat(self.spring_reject_rad),
+        npfloat(self.spring_attract_rad),
+        npint(self.max_capacity),
+        npfloat(self.outer_influence_rad),
+        npfloat(self.link_ignore_rad),
+        block=(self.threads,1,1),
+        grid=(blocks,1)
+        )
 
     xy[:num,:] += dxy[:num,:]
 
