@@ -5,6 +5,42 @@ __device__ float dist(const float *a, const float *b, const int ii, const int jj
     return sqrt(powf(a[ii]-b[jj], 2.0f)+powf(a[ii+1]-b[jj+1], 2.0f));
 }
 
+__device__ int get_candidates(
+  const int nz,
+  const int zi,
+  const int zj,
+  const int *zone_num,
+  const int *zone_node,
+  const int zone_leap,
+  const float *xy,
+  const float outer_influence_rad,
+  const int ii,
+  int *proximity
+){
+
+  int zk;
+  int jj;
+  float dd;
+
+  int count = 0;
+
+  for (int a=max(zi-1,0);a<min(zi+2,nz);a++){
+    for (int b=max(zj-1,0);b<min(zj+2,nz);b++){
+      zk = a*nz+b;
+      for (int k=0;k<zone_num[zk];k++){
+        jj = 2*zone_node[zk*zone_leap+k];
+        dd = dist(xy, xy, ii, jj);
+        if (dd<outer_influence_rad && dd>0.0f){
+          proximity[count] = jj/2;
+          count += 1;
+        }
+      }
+    }
+  }
+
+  return count;
+}
+
 __global__ void step(
   const int n,
   const int nz,
@@ -49,28 +85,14 @@ __global__ void step(
 
   int jj;
   int aa;
-  int zk;
 
   int link_count = 0;
-  int cand_count = 0;
-
-  bool linked;
 
   int proximity[PROX];
+  int cand_count = get_candidates(nz, zi, zj, zone_num, zone_node, zone_leap,
+      xy, outer_influence_rad, ii, proximity);
 
-  for (int a=max(zi-1,0);a<min(zi+2,nz);a++){
-    for (int b=max(zj-1,0);b<min(zj+2,nz);b++){
-      zk = a*nz+b;
-      for (int k=0;k<zone_num[zk];k++){
-        jj = 2*zone_node[zk*zone_leap+k];
-        dd = dist(xy, xy, ii, jj);
-        if (dd<outer_influence_rad && dd>0.0f){
-          proximity[cand_count] = jj/2;
-          cand_count += 1;
-        }
-      }
-    }
-  }
+  bool linked;
 
   for (int k=0;k<cand_count;k++){
 
