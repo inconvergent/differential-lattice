@@ -1,6 +1,10 @@
 #define THREADS _THREADS_
 #define PROX _PROX_
 
+__device__ float dist(const float *a, const float *b, const int ii, const int jj){
+    return sqrt(powf(a[ii]-b[jj], 2.0f)+powf(a[ii+1]-b[jj+1], 2.0f));
+}
+
 __global__ void step(
   const int n,
   const int nz,
@@ -49,7 +53,6 @@ __global__ void step(
 
   int link_count = 0;
   int cand_count = 0;
-  int total_count = 0;
 
   bool linked;
 
@@ -60,10 +63,7 @@ __global__ void step(
       zk = a*nz+b;
       for (int k=0;k<zone_num[zk];k++){
         jj = 2*zone_node[zk*zone_leap+k];
-        total_count += 1;
-        dx = xy[ii] - xy[jj];
-        dy = xy[ii+1] - xy[jj+1];
-        dd = sqrt(dx*dx + dy*dy);
+        dd = dist(xy, xy, ii, jj);
         if (dd<outer_influence_rad && dd>0.0f){
           proximity[cand_count] = jj/2;
           cand_count += 1;
@@ -80,6 +80,10 @@ __global__ void step(
     dy = xy[ii+1] - xy[jj+1];
     dd = sqrt(dx*dx + dy*dy);
 
+    if (dd<=0.0f){
+      continue;
+    }
+
     linked = true;
     for (int l=0;l<cand_count;l++){
       aa = 2*proximity[l];
@@ -87,40 +91,33 @@ __global__ void step(
         linked = false;
         break;
       }
-      if (dd>max(
-          sqrt(powf(xy[ii] - xy[aa],2.0f) + powf(xy[ii+1] - xy[aa+1],2.0f)),
-          sqrt(powf(xy[jj] - xy[aa],2.0f) + powf(xy[jj+1] - xy[aa+1],2.0f))
-        )
-      ){
+      if (dd>max(dist(xy, xy, aa, ii), dist(xy, xy, jj, aa))){
         linked = false;
         break;
       }
     }
 
-    if (dd>0.0f){
+    dx /= dd;
+    dy /= dd;
 
-      dx /= dd;
-      dy /= dd;
+    mx += xy[jj];
+    my += xy[jj+1];
 
-      mx += xy[jj];
-      my += xy[jj+1];
-
-      if (linked){
-        links[10*i+link_count] = jj/2;
-        link_count += 1;
-        if (dd>spring_attract_rad){
-          sx += -dx*spring_stp;
-          sy += -dy*spring_stp;
-        }
-        else if(dd<spring_reject_rad){
-          sx += dx*spring_stp;
-          sy += dy*spring_stp;
-        }
+    if (linked){
+      links[10*i+link_count] = jj/2;
+      link_count += 1;
+      if (dd>spring_attract_rad){
+        sx += -dx*spring_stp;
+        sy += -dy*spring_stp;
       }
-      else{ // unlinked
-        sx += dx*reject_stp;
-        sy += dy*reject_stp;
+      else if(dd<spring_reject_rad){
+        sx += dx*spring_stp;
+        sy += dy*spring_stp;
       }
+    }
+    else{ // unlinked
+      sx += dx*reject_stp;
+      sy += dy*reject_stp;
     }
   }
 
