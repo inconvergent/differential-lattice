@@ -100,7 +100,7 @@ __global__ void step(
 
     dx = xy[ii] - xy[jj];
     dy = xy[ii+1] - xy[jj+1];
-    dd = sqrt(dx*dx + dy*dy);
+    dd = sqrt(powf(dx, 2.0f) + powf(dy, 2.0f));
 
     if (dd<=0.0f){
       continue;
