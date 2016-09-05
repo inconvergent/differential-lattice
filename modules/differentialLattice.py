@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
+
 
 
 from numpy import pi
@@ -94,7 +94,7 @@ class DifferentialLattice(object):
   def __cuda_init(self):
 
     import pycuda.autoinit
-    from helpers import load_kernel
+    from .helpers import load_kernel
 
     self.cuda_agg = load_kernel(
         'modules/cuda/agg.cu',
@@ -162,7 +162,7 @@ class DifferentialLattice(object):
 
     edges = set()
     for i, c in enumerate(self.link_counts[:num,0]):
-      for k in xrange(c):
+      for k in range(c):
 
         j = links[10*i+k]
         if i<j:

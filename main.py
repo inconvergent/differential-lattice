@@ -1,15 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
-
-from __future__ import print_function
-
 
 
 def get_wrap(dl, colors, render_steps=10, export_steps=10):
-
-  from numpy import pi
   from fn import Fn
-  # from dddUtils.ioOBJ import export_2d as export
+  # from iutils.ioOBJ import export_2d as export
 
   fn = Fn(prefix='./res/')
 
@@ -21,7 +16,7 @@ def get_wrap(dl, colors, render_steps=10, export_steps=10):
 
     if not dl.itt % export_steps:
 
-      print('itt', dl.itt, 'num', dl.num)
+      print(('itt', dl.itt, 'num', dl.num))
       num = dl.num
 
       render.clear_canvas()
@@ -29,12 +24,22 @@ def get_wrap(dl, colors, render_steps=10, export_steps=10):
       vertices, edges = dl.link_export()
 
       render.ctx.set_source_rgba(*colors['purple'])
-      for a,b in edges:
-        render.line(vertices[a,0], vertices[a,1], vertices[b,0], vertices[b,1])
+      for a, b in edges:
+        render.line(
+            vertices[a, 0],
+            vertices[a, 1],
+            vertices[b, 0],
+            vertices[b, 1]
+            )
 
       render.ctx.set_source_rgba(*colors['front'])
-      for i in xrange(num):
-        render.circle(vertices[i,0], vertices[i,1], dl.node_rad*0.6, fill=True)
+      for i in range(num):
+        render.circle(
+            vertices[i, 0],
+            vertices[i, 1],
+            dl.node_rad*0.6,
+            fill=True
+            )
 
     if not dl.itt % export_steps:
 
@@ -49,18 +54,17 @@ def get_wrap(dl, colors, render_steps=10, export_steps=10):
 
 
 def main():
-
   from numpy import array
   from modules.differentialLattice import DifferentialLattice
-  from render.render import Animate
+  from iutils.render import Animate
   from modules.helpers import spawn_circle
 
   colors = {
-      'back': [1,1,1,1],
-      'front': [0,0,0,0.7],
-      'cyan': [0,0.6,0.6,0.7],
-      'purple': [0.6,0.0,0.6,0.7],
-      'light': [0,0,0,0.2],
+      'back': [1, 1, 1, 1],
+      'front': [0, 0, 0, 0.7],
+      'cyan': [0, 0.6, 0.6, 0.7],
+      'purple': [0.6, 0.0, 0.6, 0.7],
+      'light': [0, 0, 0, 0.2],
       }
 
   threads = 512
@@ -102,12 +106,12 @@ def main():
       spring_attract_rad,
       outer_influence_rad,
       link_ignore_rad,
-      threads = threads,
-      zone_leap = zone_leap,
-      nmax = 50000000
+      threads=threads,
+      zone_leap=zone_leap,
+      nmax=50000000
       )
 
-  spawn_circle(DL, init_num , xy=array([[0.5,0.5]]), dst=node_rad*0.8, rad=0.01)
+  spawn_circle(DL, init_num, xy=array([[0.5, 0.5]]), dst=node_rad*0.8, rad=0.01)
   wrap = get_wrap(DL, colors, render_steps, export_steps)
   render = Animate(size, colors['back'], colors['front'], wrap)
 

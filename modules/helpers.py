@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-from __future__ import print_function
+
 
 def load_kernel(fn, name, subs={}):
 
@@ -11,7 +11,7 @@ def load_kernel(fn, name, subs={}):
   with open(fn, 'r') as f:
     kernel = f.read()
 
-  for k,v in subs.iteritems():
+  for k,v in subs.items():
     kernel = kernel.replace(k, str(v))
 
   mod = SourceModule(kernel)
@@ -19,7 +19,7 @@ def load_kernel(fn, name, subs={}):
 
 def spawn_darts(dl, n, xy, dst, rad=0.4):
 
-  from dddUtils.random import darts
+  from iutils.random import darts
   num = dl.num
 
   new_xy = darts(n, 0.5, 0.5, rad, dst)
