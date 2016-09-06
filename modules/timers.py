@@ -32,7 +32,7 @@ class named_sub_timers(object):
 
     print(('{:s}'.format('' if not self.name else self.name)))
 
-    for n,t in self.times.items():
+    for n,t in list(self.times.items()):
 
       print(('{:s}\t{:0.6f}\t{:0.6f}'.format(n,t,t/total)))
 

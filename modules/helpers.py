@@ -11,7 +11,7 @@ def load_kernel(fn, name, subs={}):
   with open(fn, 'r') as f:
     kernel = f.read()
 
-  for k,v in subs.items():
+  for k,v in list(subs.items()):
     kernel = kernel.replace(k, str(v))
 
   mod = SourceModule(kernel)
