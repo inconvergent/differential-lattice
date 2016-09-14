@@ -7,7 +7,6 @@ FRONT = [0, 0, 0, 0.001]
 def main():
   from fn import Fn
   from modules.differentialLattice import DifferentialLattice
-  from modules.helpers import get_colors
   from modules.helpers import spawn_circle
   from numpy import array
   from numpy import cumsum
@@ -49,10 +48,6 @@ def main():
   spring_attract_rad = node_rad*2.0
   outer_influence_rad = 10.0*node_rad
   link_ignore_rad = 0.5*outer_influence_rad
-
-  # colors = get_colors('../colors/black_t.gif')
-  colors = get_colors('../colors/ir.jpg')
-  nc = len(colors)
 
   sand = Sand(size)
   sand.set_bg(BACK)
@@ -103,20 +98,14 @@ def main():
     #     )
 
     for k,(a,b) in enumerate(edges):
-      w = a*nc+b
-      rgba = colors[w%nc]+[0.001]
-      sand.set_rgba(rgba)
       sand.paint_strokes(
           vertices[a:a+1,:].astype('double'),
           vertices[b:b+1,:].astype('double'),
           grains
           )
 
-
     # n = 15
     # for k, (x, y) in enumerate(vertices):
-    #   rgba = colors[k%nc]+[0.0005]
-    #   sand.set_rgba(rgba)
     #   o = ones((n, 2), 'float')
     #   o[:,0] *= x
     #   o[:,1] *= y
@@ -134,8 +123,6 @@ def main():
       # sand.set_bg(BACK)
       # seed(1)
       # for k, (x, y) in enumerate(vertices):
-      #   rgba = colors[k%nc]+[0.005]
-      #   sand.set_rgba(rgba)
       #   o = ones((n, 2), 'float')
       #   o[:,0] *= x
       #   o[:,1] *= y
