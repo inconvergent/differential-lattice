@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-BACK = [1, 1, 1, 1]
+BACK = [1,1, 1, 1]
 FRONT = [0, 0, 0, 0.001]
 
 def main():
@@ -26,12 +26,12 @@ def main():
 
   fn = Fn(prefix='./res/')
 
-  size = 512
+  size = 2500
   one = 1.0/size
 
   threads = 512
   zone_leap = 512
-  grains =  20
+  grains =  10
 
 
   init_num = 20
@@ -50,8 +50,8 @@ def main():
   outer_influence_rad = 10.0*node_rad
   link_ignore_rad = 0.5*outer_influence_rad
 
-  colors = get_colors('../colors/black_t.gif')
-  # colors = get_colors('../colors/ir.jpg')
+  # colors = get_colors('../colors/black_t.gif')
+  colors = get_colors('../colors/ir.jpg')
   nc = len(colors)
 
   sand = Sand(size)
@@ -102,32 +102,32 @@ def main():
     #     grains
     #     )
 
-    # for k,(a,b) in enumerate(edges):
-    #   w = a*nc+b
-    #   rgba = colors[w%nc]+[0.001]
-    #   sand.set_rgba(rgba)
-    #   sand.paint_strokes(
-    #       vertices[a:a+1,:].astype('double'),
-    #       vertices[b:b+1,:].astype('double'),
-    #       grains
-    #       )
-
-
-    n = 20
-    for k, (x, y) in enumerate(vertices):
-      rgba = colors[k%nc]+[0.0005]
+    for k,(a,b) in enumerate(edges):
+      w = a*nc+b
+      rgba = colors[w%nc]+[0.001]
       sand.set_rgba(rgba)
-      o = ones((n, 2), 'float')
-      o[:,0] *= x
-      o[:,1] *= y
-      r = (1.0-2.0*random(n))*4*one
-      sand.paint_filled_circles(
-          o,
-          r,
+      sand.paint_strokes(
+          vertices[a:a+1,:].astype('double'),
+          vertices[b:b+1,:].astype('double'),
           grains
           )
 
-    if not itt%5:
+
+    # n = 15
+    # for k, (x, y) in enumerate(vertices):
+    #   rgba = colors[k%nc]+[0.0005]
+    #   sand.set_rgba(rgba)
+    #   o = ones((n, 2), 'float')
+    #   o[:,0] *= x
+    #   o[:,1] *= y
+    #   r = (1.0-2.0*random(n))*4*one
+    #   sand.paint_filled_circles(
+    #       o,
+    #       r,
+    #       grains
+    #       )
+    #
+    if not itt%100:
 
       # vertices, edges = DL.link_export()
       # n = 1000
@@ -150,7 +150,7 @@ def main():
 
       name = fn.name() + '.png'
       print(name)
-      sand.write_to_png(name, 2)
+      sand.write_to_png(name, 1.4)
 
 
 if __name__ == '__main__':
