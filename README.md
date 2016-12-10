@@ -23,7 +23,7 @@ This code relies on Python 3.
 In order for this code to run you must first download and install:
 
 *    `iutils`: https://github.com/inconvergent/iutils
-*    `fn`: https://github.com/inconvergent/fn-python3
+*    `fn`: https://github.com/inconvergent/fn
 
 ## Other Dependencies
 
