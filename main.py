@@ -2,6 +2,23 @@
 # -*- coding: utf-8 -*-
 
 
+def get_coord(vertices, i, scale=1.0):
+  a = float(vertices[i, 0]), float(vertices[i, 1])
+  return tuple(map(lambda x: x*scale, a))
+
+
+def write_svg(fn, vertices, edges):
+  import svgwrite
+  dwg = svgwrite.Drawing(fn+'.svg', profile='tiny')
+
+  for a, b in edges:
+    p1 = get_coord(vertices, a, scale=1000.0)
+    p2 = get_coord(vertices, b, scale=1000.0)
+    dwg.add(dwg.line(p1, p2, stroke=svgwrite.rgb(10, 10, 16, '%')))
+
+  dwg.save()
+
+
 def get_wrap(dl, colors, render_steps=10, export_steps=10):
   from fn import Fn
   # from dddUtils.ioOBJ import export_2d as export
@@ -46,6 +63,7 @@ def get_wrap(dl, colors, render_steps=10, export_steps=10):
       name = fn.name()
       render.write_to_png(name+'.png')
       # export('lattice', name+'.2obj', vertices, edges=edges)
+      write_svg(name, vertices, edges)
 
     return True
 
@@ -70,11 +88,11 @@ def main():
   threads = 512
   zone_leap = 512
 
-  size = 512
+  size = 2048
   one = 1.0/size
 
-  export_steps = 5
-  render_steps = 5
+  export_steps = 100
+  render_steps = 100
 
   init_num = 20
 
